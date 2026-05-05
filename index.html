@@ -1,0 +1,1907 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>C&M - Rotina Sequencial v3.3</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        :root {
+            --cor-laranja: #F5A623;
+            --cor-verde: #C8D946;
+            --cor-turquesa: #4ECDC4;
+            --cor-escuro: #2C5F5D;
+        }
+        .bg-cm-escuro { background-color: var(--cor-escuro); }
+        .bg-cm-laranja { background-color: var(--cor-laranja); }
+        .bg-cm-verde { background-color: var(--cor-verde); }
+        .bg-cm-turquesa { background-color: var(--cor-turquesa); }
+        .text-cm-escuro { color: var(--cor-escuro); }
+        .text-cm-laranja { color: var(--cor-laranja); }
+        .text-cm-turquesa { color: var(--cor-turquesa); }
+        .slide-in { animation: slideIn 0.3s ease-out; }
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        .timer-circle {
+            width: 80px; height: 80px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.5rem; font-weight: bold; color: white;
+            transition: background-color 0.5s;
+        }
+        .timer-ok { background-color: #10B981; }
+        .timer-warning { background-color: #F59E0B; }
+        .timer-danger { background-color: #EF4444; animation: blink 0.8s infinite; }
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+        .modal {
+            display: none; position: fixed; z-index: 50;
+            left: 0; top: 0; width: 100%; height: 100%;
+            background-color: rgba(0,0,0,0.5); overflow-y: auto;
+        }
+        .modal.active {
+            display: flex; align-items: center;
+            justify-content: center; padding: 20px;
+        }
+        .modal-content {
+            background: white; border-radius: 12px;
+            max-width: 500px; width: 100%;
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
+        }
+        .progress-bar { transition: width 0.5s ease; }
+        .tarefa-card { min-height: 420px; }
+        .regra-item { border-left: 4px solid var(--cor-turquesa); }
+        .sidebar-regras {
+            position: fixed; right: 0; top: 0; height: 100vh;
+            width: 300px; background: white;
+            box-shadow: -4px 0 6px rgba(0,0,0,0.1);
+            padding: 20px; overflow-y: auto; z-index: 40;
+        }
+        @media (max-width: 768px) { .sidebar-regras { display: none; } }
+        .btn-primary {
+            background: linear-gradient(135deg, var(--cor-laranja), var(--cor-turquesa));
+            color: white; font-weight: bold; padding: 12px 24px;
+            border-radius: 8px; transition: opacity 0.2s; cursor: pointer;
+        }
+        .btn-primary:hover { opacity: 0.9; }
+        .btn-secondary {
+            background: #6B7280; color: white; font-weight: bold;
+            padding: 12px 24px; border-radius: 8px;
+            transition: background 0.2s; cursor: pointer;
+        }
+        .btn-secondary:hover { background: #4B5563; }
+        .btn-danger {
+            background: #EF4444; color: white; font-weight: bold;
+            padding: 12px 24px; border-radius: 8px;
+            transition: background 0.2s; cursor: pointer;
+        }
+        .btn-danger:hover { background: #DC2626; }
+        .badge-prioritaria {
+            background: #FEE2E2; color: #DC2626;
+            padding: 2px 10px; border-radius: 999px;
+            font-size: 0.75rem; font-weight: bold;
+        }
+        .badge-verificacao {
+            background: #D1FAE5; color: #065F46;
+            padding: 2px 10px; border-radius: 999px;
+            font-size: 0.75rem; font-weight: bold;
+        }
+        .badge-padrao {
+            background: #DBEAFE; color: #1E40AF;
+            padding: 2px 10px; border-radius: 999px;
+            font-size: 0.75rem; font-weight: bold;
+        }
+        .aviso-dia-especial {
+            background: linear-gradient(135deg, #FEF3C7, #FDE68A);
+            border-left: 4px solid #F59E0B; border-radius: 8px;
+            padding: 16px; margin-bottom: 16px;
+        }
+        .contador-rapido {
+            display: flex; align-items: center; gap: 12px;
+            background: #F3F4F6; border-radius: 12px; padding: 16px;
+        }
+        .contador-btn {
+            width: 44px; height: 44px; border-radius: 50%;
+            font-size: 1.5rem; font-weight: bold;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; transition: transform 0.1s; border: none;
+        }
+        .contador-btn:active { transform: scale(0.9); }
+        .contador-valor {
+            font-size: 2.5rem; font-weight: bold;
+            min-width: 60px; text-align: center; color: var(--cor-escuro);
+        }
+        .tab-btn { transition: all 0.2s; }
+        .tab-btn.active { background: var(--cor-escuro); color: white; }
+
+        /* Notificações */
+        .notif-badge {
+            position: absolute; top: -6px; right: -6px;
+            background: #EF4444; color: white; border-radius: 999px;
+            font-size: 0.65rem; font-weight: bold;
+            min-width: 18px; height: 18px;
+            display: flex; align-items: center; justify-content: center;
+            padding: 0 4px;
+        }
+        .notif-card {
+            border-left: 4px solid #EF4444;
+            transition: all 0.2s;
+        }
+        .notif-card.vista { border-left-color: #F59E0B; opacity: 0.8; }
+        .notif-card.resolvida { border-left-color: #10B981; opacity: 0.6; }
+        @keyframes pulseAlert {
+            0% { box-shadow: 0 0 0 0 rgba(239,68,68,0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(239,68,68,0); }
+            100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); }
+        }
+        .pulse-alert { animation: pulseAlert 1.5s infinite; }
+    </style>
+</head>
+<body class="bg-gray-50">
+
+    <div id="modalNaoDeuTempo" class="modal">
+        <div class="modal-content">
+            <div class="bg-cm-escuro text-white p-6 rounded-t-xl">
+                <h2 class="text-xl font-bold">❌ Por que não deu tempo?</h2>
+            </div>
+            <div class="p-6">
+                <div id="conteudoModalNaoDeuTempo"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="modalPausa" class="modal">
+        <div class="modal-content">
+            <div class="bg-cm-escuro text-white p-6 rounded-t-xl">
+                <h2 class="text-xl font-bold">⏸️ Pausar Rotina</h2>
+            </div>
+            <div class="p-6">
+                <p class="text-gray-700 mb-4">Deseja pausar a rotina? Você pode continuar de onde parou.</p>
+                <div class="flex gap-3">
+                    <button onclick="app.confirmarPausa()" class="flex-1 btn-danger">Pausar</button>
+                    <button onclick="app.fecharModalPausa()" class="flex-1 btn-secondary">Cancelar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="app"></div>
+
+    <script>
+        const SUPABASE_URL = 'https://awppfluuudipkgrtrgyw.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF3cHBmbHV1dWRpcGtncnRyZ3l3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk4MTk5MDYsImV4cCI6MjA4NTM5NTkwNn0.L7EjW4ytXMbVlGxhsMb8Hh77cjRpPr5Y-KG0dR4e35A';
+        const EDGE_FUNCTION_URL = 'https://awppfluuudipkgrtrgyw.supabase.co/functions/v1/smart-endpoint';
+
+        if (!window.__cmSupabaseClient) {
+            window.__cmSupabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        }
+        var supabase = window.__cmSupabaseClient;
+
+        function getDiaSemanaAtual() {
+            const dias = ['domingo','segunda','terca','quarta','quinta','sexta','sabado'];
+            return dias[new Date().getDay()];
+        }
+        function isDiaEspecial() {
+            const dia = getDiaSemanaAtual();
+            return dia === 'segunda' || dia === 'quarta';
+        }
+        function getNomeDia() {
+            const nomes = {
+                'domingo':'Domingo','segunda':'Segunda-feira','terca':'Terça-feira',
+                'quarta':'Quarta-feira','quinta':'Quinta-feira','sexta':'Sexta-feira','sabado':'Sábado'
+            };
+            return nomes[getDiaSemanaAtual()];
+        }
+        function filtrarTarefasPorDia(tarefas) {
+            const diaAtual = getDiaSemanaAtual();
+            return tarefas.filter(t => {
+                if (!t.dias_ocultar || t.dias_ocultar.length === 0) return true;
+                return !t.dias_ocultar.includes(diaAtual);
+            });
+        }
+
+        // ── SOM DE ALERTA ──────────────────────────────────────────
+        function tocarSomAlerta() {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const toques = [
+                    { freq: 880, start: 0,   dur: 0.15 },
+                    { freq: 660, start: 0.2, dur: 0.15 },
+                    { freq: 880, start: 0.4, dur: 0.25 }
+                ];
+                toques.forEach(t => {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.frequency.value = t.freq;
+                    osc.type = 'sine';
+                    gain.gain.setValueAtTime(0.4, ctx.currentTime + t.start);
+                    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + t.start + t.dur);
+                    osc.start(ctx.currentTime + t.start);
+                    osc.stop(ctx.currentTime + t.start + t.dur + 0.05);
+                });
+            } catch(e) { console.log('Som não suportado:', e); }
+        }
+
+        class RotinaSequencial {
+            constructor() {
+                this.currentUser = null;
+                this.isAdmin = false;
+                this.periodo = null;
+                this.tarefas = [];
+                this.tarefaAtualIndex = 0;
+                this.regras = [];
+                this.metricas = { total_tarefas:0, concluidas:0, nao_deu_tempo:0, leads_atendidos:0 };
+                this.timerInterval = null;
+                this.timerSegundos = 0;
+                this.timerAtivo = false;
+                this.autoSaveInterval = null;
+                this.metricasHistorico = [];
+                this.rankingConsultores = [];
+                this.statusPlataformas = { whatsapp_ok:false, ll_ok:false, rotina_ok:true };
+                this.alertasNaoVistos = 0;
+                this.alertaCheckInterval = null;
+                this.verificarSessao();
+            }
+
+            async verificarSessao() {
+                const { data: { session } } = await supabase.auth.getSession();
+                if (session) {
+                    this.currentUser = session.user;
+                    await this.verificarAdmin();
+                    await this.carregarDados();
+                    this.iniciarAutoSave();
+                    if (this.isAdmin) {
+                        await this.verificarEGerarAlertas();
+                        this.iniciarMonitorAlertas();
+                    }
+                    this.renderDashboard();
+                } else {
+                    this.renderLogin();
+                }
+            }
+
+            async verificarAdmin() {
+                const { data } = await supabase
+                    .from('user_roles').select('is_admin')
+                    .eq('user_id', this.currentUser.id).single();
+                this.isAdmin = data?.is_admin || false;
+            }
+
+            // ── SISTEMA DE ALERTAS ─────────────────────────────────
+            iniciarMonitorAlertas() {
+                // Verifica badge a cada 60 segundos
+                this.alertaCheckInterval = setInterval(async () => {
+                    await this.atualizarBadgeAlertas();
+                    // Verifica se deve gerar novos alertas (a cada hora, 9:30-12:00 e 14:00-18:00)
+                    const agora = new Date();
+                    const hora = agora.getHours();
+                    const min = agora.getMinutes();
+                    const dentroDoPeriodo = (hora === 9 && min >= 30) ||
+                        (hora > 9 && hora < 12) ||
+                        (hora >= 14 && hora < 18);
+                    if (dentroDoPeriodo && min >= 0 && min <= 1) {
+                        await this.verificarEGerarAlertas();
+                    }
+                }, 60000);
+            }
+
+            async verificarEGerarAlertas() {
+                const hoje = new Date().toISOString().split('T')[0];
+                const agora = new Date();
+                const hora = agora.getHours();
+                const min = agora.getMinutes();
+
+                // Só gera alertas dentro do horário: 9:30-12:00 e 14:00-18:00
+                const dentroDoPeriodo = (hora === 9 && min >= 30) ||
+                    (hora > 9 && hora < 12) ||
+                    (hora >= 14 && hora < 18);
+                if (!dentroDoPeriodo) return;
+
+                // Busca todos os consultores
+                const { data: consultores } = await supabase
+                    .from('user_credentials').select('user_id, nome, email');
+                if (!consultores || consultores.length === 0) return;
+
+                for (const consultor of consultores) {
+                    // Verifica se já gerou alerta para esse consultor na última hora
+                    const umaHoraAtras = new Date(agora.getTime() - 60 * 60 * 1000).toISOString();
+                    const { data: alertaRecente } = await supabase
+                        .from('alertas_gestao')
+                        .select('id')
+                        .eq('consultor_id', consultor.user_id)
+                        .eq('data', hoje)
+                        .gte('criado_em', umaHoraAtras)
+                        .limit(1);
+                    if (alertaRecente && alertaRecente.length > 0) continue;
+
+                    // Verifica progresso do dia
+                    const { data: progresso } = await supabase
+                        .from('progresso_diario').select('*')
+                        .eq('user_id', consultor.user_id)
+                        .eq('data', hoje);
+
+                    let motivoAlerta = null;
+
+                    if (!progresso || progresso.length === 0) {
+                        motivoAlerta = `${consultor.nome || consultor.email} não iniciou nenhuma rotina hoje`;
+                    } else {
+                        const emAndamento = progresso.find(p => p.status === 'em_andamento' || p.status === 'pausado');
+                        if (emAndamento) {
+                            const ultimaAtividade = new Date(emAndamento.updated_at || emAndamento.iniciado_em);
+                            const diffMin = (agora - ultimaAtividade) / 1000 / 60;
+                            if (diffMin > 60) {
+                                motivoAlerta = `${consultor.nome || consultor.email} está sem atividade há mais de 1 hora`;
+                            }
+                        }
+                    }
+
+                    if (motivoAlerta) {
+                        await this.criarAlerta(consultor.user_id, consultor.nome || consultor.email, motivoAlerta, hoje);
+                    }
+                }
+
+                await this.atualizarBadgeAlertas();
+            }
+
+            async criarAlerta(consultorId, consultorNome, motivo, data) {
+                const { error } = await supabase.from('alertas_gestao').insert({
+                    consultor_id: consultorId,
+                    consultor_nome: consultorNome,
+                    motivo: motivo,
+                    data: data,
+                    status: 'novo',
+                    criado_em: new Date().toISOString()
+                });
+                if (!error) {
+                    tocarSomAlerta();
+                    this.alertasNaoVistos++;
+                    this.atualizarBadgeAlertas();
+                }
+            }
+
+            async atualizarBadgeAlertas() {
+                const { data, error } = await supabase
+                    .from('alertas_gestao')
+                    .select('id', { count: 'exact' })
+                    .in('status', ['novo', 'visto']);
+                if (!error) {
+                    this.alertasNaoVistos = data?.length || 0;
+                    const badge = document.getElementById('badgeAlertas');
+                    if (badge) {
+                        badge.textContent = this.alertasNaoVistos;
+                        badge.style.display = this.alertasNaoVistos > 0 ? 'flex' : 'none';
+                        if (this.alertasNaoVistos > 0) {
+                            badge.parentElement.classList.add('pulse-alert');
+                        } else {
+                            badge.parentElement.classList.remove('pulse-alert');
+                        }
+                    }
+                }
+            }
+
+            async renderPainelAlertas() {
+                const { data: alertas, error } = await supabase
+                    .from('alertas_gestao')
+                    .select('*')
+                    .order('criado_em', { ascending: false })
+                    .limit(100);
+
+                // Busca médias de falha por tarefa (7, 15 e 30 dias)
+                const { data: falhasPorTarefa } = await supabase
+                    .rpc('get_falhas_por_periodo')
+                    .limit(10);
+
+                const hoje = new Date().toISOString().split('T')[0];
+                const alertasHoje = (alertas || []).filter(a => a.data === hoje);
+                const alertasAnteriores = (alertas || []).filter(a => a.data !== hoje);
+
+                const renderCard = (a) => {
+                    const statusCor = a.status === 'novo' ? 'border-red-500 bg-red-50' :
+                                      a.status === 'visto' ? 'border-yellow-500 bg-yellow-50' :
+                                      'border-green-500 bg-green-50';
+                    const statusLabel = a.status === 'novo' ? '🔴 Novo' :
+                                        a.status === 'visto' ? '🟡 Visto' : '🟢 Resolvido';
+                    const hora = new Date(a.criado_em).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
+                    return `
+                        <div class="notif-card ${a.status} border-l-4 ${statusCor} rounded-lg p-4 mb-3">
+                            <div class="flex items-start justify-between gap-3">
+                                <div class="flex-1">
+                                    <div class="flex items-center gap-2 mb-1">
+                                        <span class="text-xs font-bold px-2 py-0.5 rounded-full bg-white border">${statusLabel}</span>
+                                        <span class="text-xs text-gray-400">${hora}</span>
+                                    </div>
+                                    <p class="font-semibold text-gray-800 text-sm">⚠️ ${a.motivo}</p>
+                                    ${a.observacao ? `<p class="text-xs text-gray-600 mt-1 italic">📝 ${a.observacao}</p>` : ''}
+                                </div>
+                                <div class="flex flex-col gap-1 flex-shrink-0">
+                                    ${a.status === 'novo' ? `
+                                        <button onclick="app.marcarAlertaVisto('${a.id}')"
+                                            class="bg-yellow-500 hover:bg-yellow-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition">
+                                            👁️ Vi
+                                        </button>` : ''}
+                                    ${a.status !== 'resolvido' ? `
+                                        <button onclick="app.abrirModalResolverAlerta('${a.id}', \`${a.motivo.replace(/`/g,"'")}\`)"
+                                            class="bg-green-500 hover:bg-green-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition">
+                                            ✅ Resolver
+                                        </button>` : ''}
+                                </div>
+                            </div>
+                        </div>`;
+                };
+
+                // Monta painel de falhas por tarefa se disponível
+                let falhasHtml = '<p class="text-gray-400 text-sm text-center py-4">Dados insuficientes ainda.</p>';
+                if (falhasPorTarefa && falhasPorTarefa.length > 0) {
+                    falhasHtml = falhasPorTarefa.map((f, i) => `
+                        <div class="flex items-start gap-3 p-3 border-l-4 border-orange-400 bg-orange-50 rounded-lg mb-2">
+                            <div class="w-7 h-7 bg-orange-500 text-white rounded-full flex items-center justify-center font-bold text-xs flex-shrink-0">${i+1}</div>
+                            <div class="flex-1">
+                                <p class="font-semibold text-gray-800 text-sm">${f.tarefa}</p>
+                                <div class="flex gap-3 mt-1 flex-wrap">
+                                    <span class="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">7d: ${f.falhas_7d}x</span>
+                                    <span class="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">15d: ${f.falhas_15d}x</span>
+                                    <span class="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">30d: ${f.falhas_30d}x</span>
+                                </div>
+                            </div>
+                        </div>`).join('');
+                }
+
+                document.getElementById('app').innerHTML = `
+                    <div class="min-h-screen bg-gray-50">
+                        <div class="bg-cm-escuro text-white shadow-lg">
+                            <div class="max-w-5xl mx-auto px-4 py-4 flex justify-between items-center">
+                                <div>
+                                    <h1 class="text-xl font-bold">🔔 Central de Alertas</h1>
+                                    <p class="text-xs text-gray-300">${alertasHoje.length} alerta(s) hoje</p>
+                                </div>
+                                <div class="flex gap-2">
+                                    <button onclick="app.voltarDashboard()" class="bg-cm-turquesa hover:opacity-90 px-4 py-2 rounded-lg text-sm">🏠 Voltar</button>
+                                    <button onclick="app.logout()" class="bg-red-500 hover:bg-red-600 px-4 py-2 rounded-lg text-sm">🚪 Sair</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="max-w-5xl mx-auto px-4 py-6 grid grid-cols-1 md:grid-cols-3 gap-4 mb-2">
+                            <div class="bg-white rounded-lg shadow p-5 border-t-4 border-red-500 text-center">
+                                <p class="text-3xl font-bold text-red-600">${(alertas||[]).filter(a=>a.status==='novo').length}</p>
+                                <p class="text-sm text-gray-500">Novos</p>
+                            </div>
+                            <div class="bg-white rounded-lg shadow p-5 border-t-4 border-yellow-500 text-center">
+                                <p class="text-3xl font-bold text-yellow-600">${(alertas||[]).filter(a=>a.status==='visto').length}</p>
+                                <p class="text-sm text-gray-500">Vistos</p>
+                            </div>
+                            <div class="bg-white rounded-lg shadow p-5 border-t-4 border-green-500 text-center">
+                                <p class="text-3xl font-bold text-green-600">${(alertas||[]).filter(a=>a.status==='resolvido').length}</p>
+                                <p class="text-sm text-gray-500">Resolvidos</p>
+                            </div>
+                        </div>
+
+                        <div class="max-w-5xl mx-auto px-4 pb-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <div class="bg-white rounded-lg shadow-lg p-5 mb-4">
+                                    <h3 class="font-bold text-gray-800 mb-3">🚨 Alertas de Hoje</h3>
+                                    ${alertasHoje.length > 0
+                                        ? alertasHoje.map(renderCard).join('')
+                                        : '<p class="text-gray-400 text-sm text-center py-6">✅ Nenhum alerta hoje</p>'}
+                                </div>
+                                ${alertasAnteriores.length > 0 ? `
+                                    <div class="bg-white rounded-lg shadow-lg p-5">
+                                        <h3 class="font-bold text-gray-800 mb-3">📋 Alertas Anteriores</h3>
+                                        ${alertasAnteriores.map(renderCard).join('')}
+                                    </div>` : ''}
+                            </div>
+
+                            <div>
+                                <div class="bg-white rounded-lg shadow-lg p-5">
+                                    <h3 class="font-bold text-gray-800 mb-1">📊 Tarefas com Mais Falhas</h3>
+                                    <p class="text-xs text-gray-400 mb-4">Média por período — toda a equipe</p>
+                                    ${falhasHtml}
+                                </div>
+                            </div>
+                        </div>
+                    </div>`;
+            }
+
+            async marcarAlertaVisto(id) {
+                await supabase.from('alertas_gestao').update({ status: 'visto' }).eq('id', id);
+                tocarSomAlerta();
+                await this.renderPainelAlertas();
+                await this.atualizarBadgeAlertas();
+            }
+
+            abrirModalResolverAlerta(id, motivo) {
+                const modal = document.createElement('div');
+                modal.id = 'modalResolver';
+                modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+                modal.innerHTML = `
+                    <div class="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full">
+                        <h2 class="text-lg font-bold text-gray-800 mb-1">✅ Resolver Alerta</h2>
+                        <p class="text-sm text-gray-500 mb-4">${motivo}</p>
+                        <textarea id="obsAlerta" rows="3" placeholder="Observação de gestão (opcional)..."
+                            class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg mb-4 focus:outline-none focus:border-green-500 text-sm"></textarea>
+                        <div class="flex gap-3">
+                            <button onclick="document.getElementById('modalResolver').remove()" class="flex-1 btn-secondary text-sm py-2">Cancelar</button>
+                            <button onclick="app.confirmarResolverAlerta('${id}')" class="flex-1 bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-4 rounded-lg text-sm transition">
+                                ✅ Confirmar Resolução
+                            </button>
+                        </div>
+                    </div>`;
+                document.body.appendChild(modal);
+                setTimeout(() => document.getElementById('obsAlerta')?.focus(), 100);
+            }
+
+            async confirmarResolverAlerta(id) {
+                const obs = document.getElementById('obsAlerta')?.value?.trim() || null;
+                await supabase.from('alertas_gestao').update({
+                    status: 'resolvido',
+                    observacao: obs,
+                    resolvido_em: new Date().toISOString()
+                }).eq('id', id);
+                document.getElementById('modalResolver')?.remove();
+                await this.renderPainelAlertas();
+                await this.atualizarBadgeAlertas();
+            }
+
+            // ── FIM SISTEMA DE ALERTAS ─────────────────────────────
+
+            async fazerLogin() {
+                const email = document.getElementById('loginEmail').value.trim();
+                const senha = document.getElementById('loginSenha').value;
+                const btn = document.getElementById('btnLogin');
+                if (!email || !senha) { alert('❌ Preencha email e senha!'); return; }
+                btn.textContent = 'Entrando...';
+                btn.disabled = true;
+                const { data, error } = await supabase.auth.signInWithPassword({ email, password: senha });
+                if (error) {
+                    alert('❌ Erro ao fazer login: ' + error.message);
+                    btn.textContent = 'Entrar';
+                    btn.disabled = false;
+                    return;
+                }
+                this.currentUser = data.user;
+                await this.verificarAdmin();
+                await this.carregarDados();
+                this.iniciarAutoSave();
+                if (this.isAdmin) {
+                    await this.verificarEGerarAlertas();
+                    this.iniciarMonitorAlertas();
+                }
+                this.renderDashboard();
+            }
+
+            async fazerCadastro() {
+                const nome = document.getElementById('cadNome').value.trim();
+                const email = document.getElementById('cadEmail').value.trim();
+                const senha = document.getElementById('cadSenha').value;
+                const confirmar = document.getElementById('cadConfirmar').value;
+                const btn = document.getElementById('btnCadastro');
+                const msgEl = document.getElementById('cadMensagem');
+
+                if (!nome || !email || !senha || !confirmar) {
+                    msgEl.innerHTML = '<p class="text-red-600 text-sm">❌ Preencha todos os campos!</p>'; return;
+                }
+                if (senha.length < 6) {
+                    msgEl.innerHTML = '<p class="text-red-600 text-sm">❌ A senha precisa ter pelo menos 6 caracteres!</p>'; return;
+                }
+                if (senha !== confirmar) {
+                    msgEl.innerHTML = '<p class="text-red-600 text-sm">❌ As senhas não coincidem!</p>'; return;
+                }
+                btn.textContent = 'Cadastrando...';
+                btn.disabled = true;
+                msgEl.innerHTML = '';
+                try {
+                    const response = await fetch(EDGE_FUNCTION_URL, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${supabase.supabaseKey}`,
+                            'apikey': supabase.supabaseKey
+                        },
+                        body: JSON.stringify({ action: 'cadastrar', nome, email, senha })
+                    });
+                    const result = await response.json();
+                    if (!response.ok || result.error) {
+                        msgEl.innerHTML = `<p class="text-red-600 text-sm">❌ ${result.error}</p>`;
+                        btn.textContent = 'Criar Conta';
+                        btn.disabled = false;
+                        return;
+                    }
+                    msgEl.innerHTML = '<p class="text-green-600 text-sm font-semibold">✅ Conta criada! Faça login agora.</p>';
+                    btn.textContent = 'Criar Conta';
+                    btn.disabled = false;
+                    setTimeout(() => this.mostrarAba('login'), 2000);
+                } catch (err) {
+                    msgEl.innerHTML = `<p class="text-red-600 text-sm">❌ Erro: ${err.message}</p>`;
+                    btn.textContent = 'Criar Conta';
+                    btn.disabled = false;
+                }
+            }
+
+            mostrarAba(aba) {
+                document.getElementById('abaLogin').classList.toggle('hidden', aba !== 'login');
+                document.getElementById('abaCadastro').classList.toggle('hidden', aba !== 'cadastro');
+                document.getElementById('tabLogin').classList.toggle('active', aba === 'login');
+                document.getElementById('tabCadastro').classList.toggle('active', aba === 'cadastro');
+            }
+
+            async logout() {
+                if (this.autoSaveInterval) clearInterval(this.autoSaveInterval);
+                if (this.alertaCheckInterval) clearInterval(this.alertaCheckInterval);
+                this.pararTimer();
+                await supabase.auth.signOut();
+                this.currentUser = null;
+                this.renderLogin();
+            }
+
+            async carregarDados() {
+                const { data: regras } = await supabase
+                    .from('regras_lembretes').select('*')
+                    .eq('sempre_visivel', true).order('ordem');
+                this.regras = regras || [];
+
+                const hoje = new Date().toISOString().split('T')[0];
+                const { data: status } = await supabase
+                    .from('status_plataformas').select('*')
+                    .eq('user_id', this.currentUser.id).eq('data', hoje).single();
+                if (status) this.statusPlataformas = status;
+
+                await this.carregarMetricasHistorico();
+                if (this.isAdmin) {
+                    await this.carregarRankingConsultores();
+                    await this.atualizarBadgeAlertas();
+                }
+            }
+
+            async carregarMetricasHistorico() {
+                const { data, error } = await supabase
+                    .from('vw_metricas_diarias').select('*')
+                    .eq('user_id', this.currentUser.id)
+                    .gte('data', new Date(Date.now() - 7*24*60*60*1000).toISOString().split('T')[0])
+                    .order('data', { ascending: false });
+                if (!error && data) this.metricasHistorico = data;
+            }
+
+            async carregarRankingConsultores() {
+                const { data, error } = await supabase.from('vw_ranking_consultores').select('*');
+                if (!error && data) this.rankingConsultores = data;
+            }
+
+            iniciarAutoSave() {
+                if (this.autoSaveInterval) clearInterval(this.autoSaveInterval);
+                this.autoSaveInterval = setInterval(() => {
+                    if (this.periodo && this.tarefas.length > 0) this.salvarProgresso();
+                }, 30000);
+            }
+
+            iniciarTimer() {
+                this.pararTimer();
+                this.timerSegundos = 300;
+                this.timerAtivo = true;
+                this.atualizarDisplayTimer();
+                this.timerInterval = setInterval(() => {
+                    this.timerSegundos--;
+                    this.atualizarDisplayTimer();
+                    if (this.timerSegundos <= 0) { this.pararTimer(); this.alertaTimer(); }
+                }, 1000);
+            }
+
+            pararTimer() {
+                if (this.timerInterval) { clearInterval(this.timerInterval); this.timerInterval = null; }
+                this.timerAtivo = false;
+            }
+
+            resetarTimer() {
+                this.pararTimer();
+                this.timerSegundos = 300;
+                this.timerAtivo = true;
+                this.atualizarDisplayTimer();
+                this.timerInterval = setInterval(() => {
+                    this.timerSegundos--;
+                    this.atualizarDisplayTimer();
+                    if (this.timerSegundos <= 0) { this.pararTimer(); this.alertaTimer(); }
+                }, 1000);
+            }
+
+            atualizarDisplayTimer() {
+                const el = document.getElementById('timerDisplay');
+                if (!el) return;
+                const min = Math.floor(this.timerSegundos / 60);
+                const seg = this.timerSegundos % 60;
+                el.textContent = `${String(min).padStart(2,'0')}:${String(seg).padStart(2,'0')}`;
+                const circle = document.getElementById('timerCircle');
+                if (!circle) return;
+                circle.className = 'timer-circle';
+                if (this.timerSegundos > 180) circle.classList.add('timer-ok');
+                else if (this.timerSegundos > 60) circle.classList.add('timer-warning');
+                else circle.classList.add('timer-danger');
+            }
+
+            alertaTimer() {
+                const el = document.getElementById('timerDisplay');
+                if (el) el.textContent = '00:00';
+                const circle = document.getElementById('timerCircle');
+                if (circle) { circle.className = 'timer-circle timer-danger'; circle.innerHTML = '⚠️'; }
+                if (navigator.vibrate) navigator.vibrate([300,100,300]);
+                tocarSomAlerta();
+            }
+
+            incrementarContador() {
+                const tarefa = this.tarefas[this.tarefaAtualIndex];
+                tarefa.contador_valor = (tarefa.contador_valor || 0) + 1;
+                const el = document.getElementById('contadorValorDisplay');
+                if (el) el.textContent = tarefa.contador_valor;
+                this.atualizarMetricasLeads();
+            }
+
+            decrementarContador() {
+                const tarefa = this.tarefas[this.tarefaAtualIndex];
+                if (tarefa.contador_valor > 0) {
+                    tarefa.contador_valor--;
+                    const el = document.getElementById('contadorValorDisplay');
+                    if (el) el.textContent = tarefa.contador_valor;
+                    this.atualizarMetricasLeads();
+                }
+            }
+
+            atualizarMetricasLeads() {
+                if (this.tarefas[this.tarefaAtualIndex].categoria === 'atendimento') {
+                    this.metricas.leads_atendidos = this.tarefas
+                        .filter(t => t.categoria === 'atendimento' && t.contador_valor)
+                        .reduce((sum, t) => sum + (t.contador_valor || 0), 0);
+                    const el = document.getElementById('metricaLeads');
+                    if (el) el.textContent = this.metricas.leads_atendidos;
+                }
+            }
+
+            async iniciarRotina(periodo) {
+                this.periodo = periodo;
+                const { data: templates } = await supabase
+                    .from('rotina_templates').select('*')
+                    .eq('periodo', periodo).order('ordem');
+                if (!templates || templates.length === 0) {
+                    alert('❌ Nenhuma tarefa encontrada para este período!'); return;
+                }
+                const tarefasFiltradas = filtrarTarefasPorDia(templates);
+                const hoje = new Date().toISOString().split('T')[0];
+                const { data: progressoSalvo } = await supabase
+                    .from('progresso_diario').select('*')
+                    .eq('user_id', this.currentUser.id).eq('data', hoje).eq('periodo', periodo).single();
+
+                if (progressoSalvo && (progressoSalvo.status === 'em_andamento' || progressoSalvo.status === 'pausado')) {
+                    const continuar = confirm('Você tem uma rotina em andamento! Deseja continuar de onde parou?');
+                    if (continuar) {
+                        this.tarefas = progressoSalvo.progresso.tarefas;
+                        this.tarefaAtualIndex = progressoSalvo.tarefa_atual_index;
+                        this.metricas = progressoSalvo.metricas;
+                        this.renderTarefaAtual(); return;
+                    }
+                }
+
+                this.tarefas = tarefasFiltradas.map((t, index) => ({
+                    ...t, index, status:'pendente',
+                    motivo_nao_concluida:null, horario_conclusao:null, contador_valor:0
+                }));
+                this.tarefaAtualIndex = 0;
+                this.metricas = { total_tarefas:this.tarefas.length, concluidas:0, nao_deu_tempo:0, leads_atendidos:0 };
+
+                await supabase.from('progresso_diario').upsert({
+                    user_id: this.currentUser.id, data: hoje, periodo,
+                    tarefa_atual_index: 0, progresso: { tarefas: this.tarefas },
+                    metricas: this.metricas, status:'em_andamento', iniciado_em: new Date().toISOString()
+                }, { onConflict:'user_id,data,periodo' });
+
+                this.renderTarefaAtual();
+            }
+
+            async concluirTarefa() {
+                const tarefa = this.tarefas[this.tarefaAtualIndex];
+                tarefa.status = 'concluida';
+                tarefa.horario_conclusao = new Date().toISOString();
+                this.metricas.concluidas++;
+                this.pararTimer();
+                await this.salvarProgresso();
+                await this.proximaTarefa();
+            }
+
+            async proximaTarefa() {
+                if (this.tarefaAtualIndex < this.tarefas.length - 1) {
+                    this.tarefaAtualIndex++;
+                    await this.salvarProgresso();
+                    this.renderTarefaAtual();
+                } else {
+                    await this.finalizarRotina();
+                }
+            }
+
+            async tarefaAnterior() {
+                if (this.tarefaAtualIndex > 0) {
+                    this.tarefaAtualIndex--;
+                    this.pararTimer();
+                    await this.salvarProgresso();
+                    this.renderTarefaAtual();
+                }
+            }
+
+            async irParaTarefa(index) {
+                this.tarefaAtualIndex = index;
+                this.pararTimer();
+                await this.salvarProgresso();
+                this.renderTarefaAtual();
+            }
+
+            async salvarProgresso() {
+                const hoje = new Date().toISOString().split('T')[0];
+                await supabase.from('progresso_diario').upsert({
+                    user_id: this.currentUser.id, data: hoje, periodo: this.periodo,
+                    tarefa_atual_index: this.tarefaAtualIndex,
+                    progresso: { tarefas: this.tarefas },
+                    metricas: this.metricas, status:'em_andamento'
+                }, { onConflict:'user_id,data,periodo' });
+            }
+
+            async finalizarRotina() {
+                const hoje = new Date().toISOString().split('T')[0];
+                this.pararTimer();
+                await supabase.from('progresso_diario').update({
+                    status:'finalizado', finalizado_em: new Date().toISOString(), metricas: this.metricas
+                }).eq('user_id', this.currentUser.id).eq('data', hoje).eq('periodo', this.periodo);
+                this.renderResumo();
+            }
+
+            abrirModalPausa() { document.getElementById('modalPausa').classList.add('active'); }
+            fecharModalPausa() { document.getElementById('modalPausa').classList.remove('active'); }
+
+            async confirmarPausa() {
+                const hoje = new Date().toISOString().split('T')[0];
+                this.pararTimer();
+                await supabase.from('progresso_diario').update({ status:'pausado' })
+                    .eq('user_id', this.currentUser.id).eq('data', hoje).eq('periodo', this.periodo);
+                this.fecharModalPausa();
+                this.renderDashboard();
+            }
+
+            abrirModalNaoDeuTempo() {
+                this.renderModalNaoDeuTempo();
+                document.getElementById('modalNaoDeuTempo').classList.add('active');
+            }
+            fecharModalNaoDeuTempo() { document.getElementById('modalNaoDeuTempo').classList.remove('active'); }
+
+            renderModalNaoDeuTempo() {
+                const conteudo = document.getElementById('conteudoModalNaoDeuTempo');
+                conteudo.innerHTML = `
+                    <div class="space-y-4">
+                        <p class="text-gray-700 font-semibold">Selecione o motivo:</p>
+                        <div class="space-y-2">
+                            ${[['Muitos atendimentos','😰'],['Problema técnico','🔧'],['Reunião não prevista','📅'],['Falta de tempo','⏰']].map(([val,ico]) => `
+                                <label class="flex items-center gap-3 p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50">
+                                    <input type="radio" name="motivo" value="${val}" class="w-5 h-5">
+                                    <span>${ico} ${val}</span>
+                                </label>`).join('')}
+                            <label class="flex items-center gap-3 p-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50">
+                                <input type="radio" name="motivo" value="outro" class="w-5 h-5">
+                                <span>✏️ Outro (especificar)</span>
+                            </label>
+                        </div>
+                        <div id="outroMotivoContainer" style="display:none;">
+                            <textarea id="outroMotivoTexto" rows="3"
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none"
+                                placeholder="Digite o motivo específico..."></textarea>
+                        </div>
+                        <div class="flex gap-3 mt-6">
+                            <button onclick="app.confirmarNaoDeuTempo()" class="flex-1 btn-danger">Confirmar e Avançar</button>
+                            <button onclick="app.fecharModalNaoDeuTempo()" class="flex-1 btn-secondary">Cancelar</button>
+                        </div>
+                    </div>`;
+                document.querySelectorAll('input[name="motivo"]').forEach(r => {
+                    r.addEventListener('change', e => {
+                        document.getElementById('outroMotivoContainer').style.display =
+                            e.target.value === 'outro' ? 'block' : 'none';
+                    });
+                });
+            }
+
+            async confirmarNaoDeuTempo() {
+                const motivoSel = document.querySelector('input[name="motivo"]:checked');
+                if (!motivoSel) { alert('❌ Selecione um motivo!'); return; }
+                let motivo = motivoSel.value;
+                if (motivo === 'outro') {
+                    const txt = document.getElementById('outroMotivoTexto').value.trim();
+                    if (!txt) { alert('❌ Digite o motivo específico!'); return; }
+                    motivo = txt;
+                }
+                const tarefa = this.tarefas[this.tarefaAtualIndex];
+                tarefa.status = 'nao_deu_tempo';
+                tarefa.motivo_nao_concluida = motivo;
+                tarefa.horario_conclusao = new Date().toISOString();
+                this.metricas.nao_deu_tempo++;
+                this.pararTimer();
+                this.fecharModalNaoDeuTempo();
+                await this.salvarProgresso();
+                await this.proximaTarefa();
+            }
+
+            refazerTarefa() {
+                const tarefa = this.tarefas[this.tarefaAtualIndex];
+                if (tarefa.status === 'nao_deu_tempo') {
+                    tarefa.status = 'pendente';
+                    tarefa.motivo_nao_concluida = null;
+                    tarefa.horario_conclusao = null;
+                    this.metricas.nao_deu_tempo--;
+                    this.renderTarefaAtual();
+                }
+            }
+
+            calcularProgresso() {
+                const total = this.tarefas.length;
+                if (total === 0) return 0;
+                const realizadas = this.tarefas.filter(t => t.status === 'concluida' || t.status === 'nao_deu_tempo').length;
+                return Math.round((realizadas / total) * 100);
+            }
+
+            renderLogin() {
+                document.getElementById('app').innerHTML = `
+                    <div class="min-h-screen bg-cm-escuro flex items-center justify-center p-4">
+                        <div class="bg-white rounded-lg shadow-2xl p-8 w-full max-w-md">
+                            <div class="flex justify-center mb-8">
+                                <div class="flex gap-2">
+                                    <div class="w-16 h-20 bg-cm-laranja rounded flex items-center justify-center">
+                                        <span class="text-cm-escuro text-4xl font-bold">C</span>
+                                    </div>
+                                    <div class="w-16 h-20 bg-cm-verde rounded flex items-center justify-center">
+                                        <span class="text-cm-escuro text-4xl font-bold">&</span>
+                                    </div>
+                                    <div class="w-16 h-20 bg-cm-turquesa rounded flex items-center justify-center">
+                                        <span class="text-cm-escuro text-4xl font-bold">M</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <h1 class="text-2xl font-bold text-center text-cm-escuro mb-2">Rotina do Consultor v3.3</h1>
+                            <p class="text-gray-500 text-center mb-6 text-sm">🎯 Uma tarefa por vez · ⏱️ Timer 5min · 📊 Métricas</p>
+                            <div class="flex gap-2 mb-6 bg-gray-100 p-1 rounded-lg">
+                                <button id="tabLogin" onclick="app.mostrarAba('login')"
+                                    class="tab-btn active flex-1 py-2 rounded-md font-semibold text-sm">
+                                    🔑 Entrar
+                                </button>
+                                <button id="tabCadastro" onclick="app.mostrarAba('cadastro')"
+                                    class="tab-btn flex-1 py-2 rounded-md font-semibold text-sm text-gray-600">
+                                    ✨ Criar Conta
+                                </button>
+                            </div>
+                            <div id="abaLogin">
+                                <input type="email" id="loginEmail" placeholder="Email"
+                                    class="w-full px-4 py-3 border border-gray-300 rounded-lg mb-4 focus:outline-none focus:border-cm-turquesa" />
+                                <input type="password" id="loginSenha" placeholder="Senha"
+                                    class="w-full px-4 py-3 border border-gray-300 rounded-lg mb-6 focus:outline-none focus:border-cm-turquesa"
+                                    onkeypress="if(event.key==='Enter') app.fazerLogin()" />
+                                <button id="btnLogin" onclick="app.fazerLogin()" class="w-full btn-primary py-3">Entrar</button>
+                            </div>
+                            <div id="abaCadastro" class="hidden">
+                                <input type="text" id="cadNome" placeholder="Seu nome completo"
+                                    class="w-full px-4 py-3 border border-gray-300 rounded-lg mb-4 focus:outline-none focus:border-cm-turquesa" />
+                                <input type="email" id="cadEmail" placeholder="Email"
+                                    class="w-full px-4 py-3 border border-gray-300 rounded-lg mb-4 focus:outline-none focus:border-cm-turquesa" />
+                                <input type="password" id="cadSenha" placeholder="Senha (mínimo 6 caracteres)"
+                                    class="w-full px-4 py-3 border border-gray-300 rounded-lg mb-4 focus:outline-none focus:border-cm-turquesa" />
+                                <input type="password" id="cadConfirmar" placeholder="Confirmar senha"
+                                    class="w-full px-4 py-3 border border-gray-300 rounded-lg mb-4 focus:outline-none focus:border-cm-turquesa"
+                                    onkeypress="if(event.key==='Enter') app.fazerCadastro()" />
+                                <div id="cadMensagem" class="mb-4"></div>
+                                <button id="btnCadastro" onclick="app.fazerCadastro()" class="w-full btn-primary py-3">Criar Conta</button>
+                            </div>
+                        </div>
+                    </div>`;
+            }
+
+            renderDashboard() {
+                const nomeUsuario = this.currentUser.user_metadata?.nome || this.currentUser.email.split('@')[0];
+                const horaAtual = new Date().getHours();
+                const periodo = horaAtual < 13 ? 'manha' : 'tarde';
+                const periodoTexto = periodo === 'manha' ? '🌅 Manhã' : '🌆 Tarde';
+                const diaEspecial = isDiaEspecial();
+                const nomeDia = getNomeDia();
+
+                document.getElementById('app').innerHTML = `
+                    <div class="min-h-screen bg-gray-50">
+                        <div class="bg-cm-escuro text-white shadow-lg">
+                            <div class="max-w-4xl mx-auto px-4 py-4 flex justify-between items-center">
+                                <div>
+                                    <h1 class="text-xl font-bold">C&M Rotina v3.3</h1>
+                                    <p class="text-xs text-gray-300">Olá, ${nomeUsuario}! · ${nomeDia}</p>
+                                </div>
+                                <button onclick="app.logout()" class="bg-red-500 hover:bg-red-600 px-4 py-2 rounded-lg text-sm">🚪 Sair</button>
+                            </div>
+                        </div>
+                        <div class="bg-white shadow border-b">
+                            <div class="max-w-4xl mx-auto flex gap-2 px-4 py-3 overflow-x-auto">
+                                <button class="px-4 py-2 rounded-lg whitespace-nowrap font-semibold bg-cm-turquesa text-white">🏠 Início</button>
+                                <button onclick="app.renderMetricasIndividuais()" class="px-4 py-2 rounded-lg whitespace-nowrap font-semibold bg-gray-200 text-gray-700 hover:bg-gray-300">📊 Meu Desempenho</button>
+                                ${this.isAdmin ? `
+                                    <button onclick="app.renderDashboardAdminGeral()" class="px-4 py-2 rounded-lg whitespace-nowrap font-semibold bg-gray-200 text-gray-700 hover:bg-gray-300">👥 Equipe</button>
+                                    <div class="relative inline-block">
+                                        <button onclick="app.renderPainelAlertas()" class="px-4 py-2 rounded-lg whitespace-nowrap font-semibold bg-red-100 text-red-700 hover:bg-red-200">
+                                            🔔 Alertas
+                                        </button>
+                                        <span id="badgeAlertas" class="notif-badge" style="display:none;">0</span>
+                                    </div>
+                                    <button onclick="app.renderPainelUsuarios()" class="px-4 py-2 rounded-lg whitespace-nowrap font-semibold bg-purple-100 text-purple-700 hover:bg-purple-200">👑 Usuários</button>
+                                ` : ''}
+                            </div>
+                        </div>
+                        <div class="max-w-4xl mx-auto px-4 py-8">
+                            ${diaEspecial ? `
+                                <div class="
+
+
+
+
+${diaEspecial ? `
+                                <div class="aviso-dia-especial mb-6">
+                                    <div class="flex items-start gap-3">
+                                        <span class="text-2xl">📚</span>
+                                        <div>
+                                            <p class="font-bold text-yellow-800 text-lg">Hoje é ${nomeDia} — Dia de Treinamento</p>
+                                            <p class="text-yellow-700 mt-1">As tarefas de <strong>prospecção</strong> e <strong>remarketing</strong> estão desativadas hoje.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            ` : ''}
+                            <div class="bg-white rounded-lg shadow-lg p-8 mb-6">
+                                <h2 class="text-3xl font-bold text-cm-escuro mb-2 text-center">${periodoTexto}</h2>
+                                <p class="text-gray-500 text-center mb-8">Pronto para iniciar sua rotina?</p>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                                    <div class="bg-blue-50 border-l-4 border-blue-400 p-4 rounded">
+                                        <p class="font-semibold text-blue-800">📋 Tarefas do Período</p>
+                                        <p class="text-2xl font-bold text-blue-900">${periodo === 'manha' ? '11' : (diaEspecial ? '14' : '16')}</p>
+                                        ${diaEspecial ? '<p class="text-xs text-blue-600">2 tarefas ocultas hoje</p>' : ''}
+                                    </div>
+                                    <div class="bg-green-50 border-l-4 border-green-400 p-4 rounded">
+                                        <p class="font-semibold text-green-800">🔴 Prioridade Máxima</p>
+                                        <p class="text-sm font-bold text-green-900">Leads do quiz no WhatsApp</p>
+                                        <p class="text-xs text-green-700">Atender em até 5 minutos</p>
+                                    </div>
+                                </div>
+                                <button onclick="app.iniciarRotina('${periodo}')" class="w-full btn-primary text-lg py-4">
+                                    🚀 Iniciar Rotina de ${periodoTexto}
+                                </button>
+                                ${!this.isAdmin ? `
+                                    <button onclick="app.abrirModalAdmin()" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg mt-4 text-sm transition">
+                                        👑 Ativar Modo Admin
+                                    </button>
+                                ` : ''}
+                            </div>
+                            <div class="bg-yellow-50 border-l-4 border-yellow-400 p-6 rounded-lg">
+                                <h3 class="font-bold text-yellow-800 mb-3">💡 Como funciona:</h3>
+                                <ul class="text-gray-700 space-y-2 text-sm">
+                                    <li>✅ Uma tarefa por vez na tela</li>
+                                    <li>⏱️ Timer de 5 minutos nas tarefas prioritárias</li>
+                                    <li>➕ Contador rápido de leads atendidos</li>
+                                    <li>📊 Métricas em tempo real</li>
+                                    <li>💾 Salvamento automático a cada 30 segundos</li>
+                                    <li>❌ Opção "Não deu tempo" com justificativa</li>
+                                    <li>📅 Tarefas ajustadas automaticamente por dia da semana</li>
+                                    <li>🔔 Alertas automáticos de gestão a partir das 9h30</li>
+                                </ul>
+                            </div>
+                        </div>
+                        ${this.renderSidebarRegras()}
+                    </div>`;
+
+                // Atualiza badge após renderizar
+                if (this.isAdmin) setTimeout(() => this.atualizarBadgeAlertas(), 500);
+            }
+
+            async renderPainelUsuarios() {
+                const { data: usuarios } = await supabase
+                    .from('user_credentials').select('*').order('created_at', { ascending: false });
+
+                document.getElementById('app').innerHTML = `
+                    <div class="min-h-screen bg-gray-50">
+                        <div class="bg-cm-escuro text-white shadow-lg">
+                            <div class="max-w-5xl mx-auto px-4 py-4 flex justify-between items-center">
+                                <h1 class="text-xl font-bold">👑 Gerenciar Usuários</h1>
+                                <div class="flex gap-2">
+                                    <button onclick="app.voltarDashboard()" class="bg-cm-turquesa hover:opacity-90 px-4 py-2 rounded-lg text-sm">🏠 Voltar</button>
+                                    <button onclick="app.logout()" class="bg-red-500 hover:bg-red-600 px-4 py-2 rounded-lg text-sm">🚪 Sair</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="max-w-5xl mx-auto px-4 py-8">
+                            <div class="bg-white rounded-lg shadow-lg p-6">
+                                <div class="flex justify-between items-center mb-6">
+                                    <h2 class="text-lg font-bold text-gray-800">Consultores Cadastrados</h2>
+                                    <span class="bg-cm-turquesa text-white px-3 py-1 rounded-full text-sm font-semibold">
+                                        ${(usuarios || []).length} usuários
+                                    </span>
+                                </div>
+                                ${!usuarios || usuarios.length === 0 ? `
+                                    <div class="text-center py-12">
+                                        <div class="text-6xl mb-4">👤</div>
+                                        <p class="text-gray-500">Nenhum usuário cadastrado ainda.</p>
+                                    </div>
+                                ` : `
+                                    <div class="space-y-4">
+                                        ${usuarios.map(u => `
+                                            <div class="border border-gray-200 rounded-lg p-5 hover:bg-gray-50 transition">
+                                                <div class="flex flex-col md:flex-row md:items-center gap-4">
+                                                    <div class="flex-1">
+                                                        <div class="flex items-center gap-3 mb-1">
+                                                            <div class="w-10 h-10 bg-cm-turquesa rounded-full flex items-center justify-center text-white font-bold text-lg flex-shrink-0">
+                                                                ${(u.nome || '?').charAt(0).toUpperCase()}
+                                                            </div>
+                                                            <div>
+                                                                <p class="font-bold text-gray-800">${u.nome || 'Sem nome'}</p>
+                                                                <p class="text-sm text-gray-500">${u.email}</p>
+                                                            </div>
+                                                        </div>
+                                                        <p class="text-xs text-gray-400 mt-2">
+                                                            Cadastrado em ${new Date(u.created_at).toLocaleDateString('pt-BR')}
+                                                        </p>
+                                                    </div>
+                                                    <div class="flex gap-2 flex-wrap">
+                                                        <button onclick="app.abrirModalAlterarSenha('${u.user_id}','${u.nome}')"
+                                                            class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold transition">
+                                                            🔑 Alterar Senha
+                                                        </button>
+                                                        <button onclick="app.confirmarExcluirUsuario('${u.user_id}','${u.nome}')"
+                                                            class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg text-sm font-semibold transition">
+                                                            🗑️ Excluir
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>`).join('')}
+                                    </div>
+                                `}
+                            </div>
+                        </div>
+                    </div>`;
+            }
+
+            abrirModalAlterarSenha(userId, nome) {
+                const modal = document.createElement('div');
+                modal.id = 'modalAlterarSenha';
+                modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+                modal.innerHTML = `
+                    <div class="bg-white rounded-xl shadow-2xl p-8 max-w-md w-full">
+                        <h2 class="text-xl font-bold text-gray-800 mb-1">🔑 Alterar Senha</h2>
+                        <p class="text-gray-500 text-sm mb-6">Consultor: <strong>${nome}</strong></p>
+                        <input type="password" id="novaSenhaInput" placeholder="Nova senha (mínimo 6 caracteres)"
+                            class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg mb-4 focus:outline-none focus:border-blue-500" />
+                        <input type="password" id="confirmarSenhaInput" placeholder="Confirmar nova senha"
+                            class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg mb-4 focus:outline-none focus:border-blue-500" />
+                        <div id="msgAlterarSenha" class="mb-4"></div>
+                        <div class="flex gap-3">
+                            <button onclick="document.getElementById('modalAlterarSenha').remove()" class="flex-1 btn-secondary">Cancelar</button>
+                            <button onclick="app.executarAlterarSenha('${userId}')" id="btnAlterarSenha"
+                                class="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg transition">
+                                Salvar Senha
+                            </button>
+                        </div>
+                    </div>`;
+                document.body.appendChild(modal);
+                setTimeout(() => document.getElementById('novaSenhaInput')?.focus(), 100);
+            }
+
+            async executarAlterarSenha(userId) {
+                const novaSenha = document.getElementById('novaSenhaInput').value;
+                const confirmar = document.getElementById('confirmarSenhaInput').value;
+                const msgEl = document.getElementById('msgAlterarSenha');
+                const btn = document.getElementById('btnAlterarSenha');
+                if (!novaSenha || !confirmar) {
+                    msgEl.innerHTML = '<p class="text-red-600 text-sm">❌ Preencha os dois campos!</p>'; return;
+                }
+                if (novaSenha.length < 6) {
+                    msgEl.innerHTML = '<p class="text-red-600 text-sm">❌ Mínimo 6 caracteres!</p>'; return;
+                }
+                if (novaSenha !== confirmar) {
+                    msgEl.innerHTML = '<p class="text-red-600 text-sm">❌ As senhas não coincidem!</p>'; return;
+                }
+                btn.textContent = 'Salvando...';
+                btn.disabled = true;
+                try {
+                    const { data: { session } } = await supabase.auth.getSession();
+                    const response = await fetch(EDGE_FUNCTION_URL, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${session.access_token}`
+                        },
+                        body: JSON.stringify({ target_user_id: userId, nova_senha: novaSenha })
+                    });
+                    const result = await response.json();
+                    if (!response.ok || result.error) {
+                        msgEl.innerHTML = `<p class="text-red-600 text-sm">❌ ${result.error || 'Erro ao alterar senha'}</p>`;
+                        btn.textContent = 'Salvar Senha';
+                        btn.disabled = false;
+                        return;
+                    }
+                    await supabase.from('user_credentials')
+                        .update({ senha_original: novaSenha }).eq('user_id', userId);
+                    msgEl.innerHTML = '<p class="text-green-600 text-sm font-semibold">✅ Senha alterada com sucesso!</p>';
+                    btn.textContent = 'Salvar Senha';
+                    btn.disabled = false;
+                    setTimeout(() => document.getElementById('modalAlterarSenha')?.remove(), 1500);
+                } catch (err) {
+                    msgEl.innerHTML = `<p class="text-red-600 text-sm">❌ Erro: ${err.message}</p>`;
+                    btn.textContent = 'Salvar Senha';
+                    btn.disabled = false;
+                }
+            }
+
+            confirmarExcluirUsuario(userId, nome) {
+                const modal = document.createElement('div');
+                modal.id = 'modalExcluir';
+                modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4';
+                modal.innerHTML = `
+                    <div class="bg-white rounded-xl shadow-2xl p-8 max-w-md w-full text-center">
+                        <div class="text-5xl mb-4">⚠️</div>
+                        <h2 class="text-xl font-bold text-gray-800 mb-2">Excluir Usuário?</h2>
+                        <p class="text-gray-600 mb-2">Você está prestes a excluir:</p>
+                        <p class="font-bold text-red-600 text-lg mb-6">${nome}</p>
+                        <p class="text-sm text-gray-500 mb-6">Esta ação não pode ser desfeita.</p>
+                        <div class="flex gap-3">
+                            <button onclick="document.getElementById('modalExcluir').remove()" class="flex-1 btn-secondary">Cancelar</button>
+                            <button onclick="app.executarExcluirUsuario('${userId}')" class="flex-1 btn-danger">Excluir</button>
+                        </div>
+                    </div>`;
+                document.body.appendChild(modal);
+            }
+
+            async executarExcluirUsuario(userId) {
+                document.getElementById('modalExcluir')?.remove();
+                const { error } = await supabase.from('user_credentials').delete().eq('user_id', userId);
+                if (error) { alert('❌ Erro ao excluir: ' + error.message); return; }
+                alert('✅ Usuário excluído com sucesso!');
+                this.renderPainelUsuarios();
+            }
+
+            renderTarefaAtual() {
+                const tarefa = this.tarefas[this.tarefaAtualIndex];
+                const progresso = this.calcularProgresso();
+                const periodoTexto = this.periodo === 'manha' ? '🌅 Manhã' : '🌆 Tarde';
+                const estaConcluida = tarefa.status === 'concluida';
+                const naoDeuTempo = tarefa.status === 'nao_deu_tempo';
+                const deveIniciarTimer = tarefa.tem_timer && !estaConcluida && !naoDeuTempo;
+
+                let corHeader = 'bg-blue-500';
+                if (estaConcluida) corHeader = 'bg-green-500';
+                else if (naoDeuTempo) corHeader = 'bg-orange-500';
+                else if (tarefa.tipo === 'prioritaria') corHeader = 'bg-red-600';
+                else if (tarefa.tipo === 'verificacao') corHeader = 'bg-green-600';
+
+                let badgeHtml = '';
+                if (tarefa.tipo === 'prioritaria') badgeHtml = '<span class="badge-prioritaria">🔴 PRIORIDADE</span>';
+                else if (tarefa.tipo === 'verificacao') badgeHtml = '<span class="badge-verificacao">✅ VERIFICAÇÃO</span>';
+                else badgeHtml = '<span class="badge-padrao">📋 TAREFA</span>';
+
+                const mapaTarefas = this.tarefas.map((t, index) => {
+                    let cor = 'bg-gray-300';
+                    let icone = index + 1;
+                    if (t.status === 'concluida') { cor = 'bg-green-500'; icone = '✓'; }
+                    else if (t.status === 'nao_deu_tempo') { cor = 'bg-orange-400'; icone = '⚠'; }
+                    else if (t.tipo === 'prioritaria') cor = 'bg-red-200';
+                    const estaAtual = index === this.tarefaAtualIndex;
+                    return `<button onclick="app.irParaTarefa(${index})"
+                        class="${cor} ${estaAtual ? 'ring-4 ring-blue-500 scale-110' : ''} w-10 h-10 rounded-lg text-white font-bold text-xs flex items-center justify-center transition-all hover:scale-110"
+                        title="${t.texto}">${icone}</button>`;
+                }).join('');
+
+                const timerHtml = tarefa.tem_timer && !estaConcluida ? `
+                    <div class="flex flex-col items-center gap-2">
+                        <div id="timerCircle" class="timer-circle timer-ok">
+                            <span id="timerDisplay">05:00</span>
+                        </div>
+                        <button onclick="app.resetarTimer()" class="text-xs bg-white bg-opacity-20 hover:bg-opacity-30 px-3 py-1 rounded-full transition">
+                            🔄 Resetar
+                        </button>
+                    </div>` : '';
+
+                const contadorHtml = tarefa.tem_contador && !estaConcluida && !naoDeuTempo ? `
+                    <div class="mb-6">
+                        <p class="text-sm font-semibold text-gray-700 mb-3">📊 Contador de atendimentos:</p>
+                        <div class="contador-rapido">
+                            <button onclick="app.decrementarContador()" class="contador-btn bg-red-100 text-red-600 hover:bg-red-200">−</button>
+                            <span id="contadorValorDisplay" class="contador-valor">${tarefa.contador_valor || 0}</span>
+                            <button onclick="app.incrementarContador()" class="contador-btn bg-green-100 text-green-600 hover:bg-green-200">+</button>
+                            <span class="text-gray-500 text-sm ml-2">atendimentos</span>
+                        </div>
+                    </div>` : '';
+
+                const contadorConcluidoHtml = tarefa.tem_contador && estaConcluida && tarefa.contador_valor > 0 ? `
+                    <div class="bg-green-50 border border-green-200 rounded-lg p-4 mb-6 text-center">
+                        <p class="text-sm text-gray-600">Atendimentos registrados</p>
+                        <p class="text-4xl font-bold text-green-600">${tarefa.contador_valor}</p>
+                    </div>` : '';
+
+                const botoesAcao = estaConcluida ? `
+                    <div class="bg-green-50 border-2 border-green-500 rounded-lg p-6 text-center">
+                        <div class="text-5xl mb-3">✅</div>
+                        <h3 class="text-xl font-bold text-green-700 mb-1">Tarefa Concluída!</h3>
+                        <p class="text-green-600 text-sm">Finalizada às ${new Date(tarefa.horario_conclusao).toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'})}</p>
+                        <p class="text-xs text-gray-400 mt-3">Esta tarefa está bloqueada e não pode ser alterada</p>
+                    </div>
+                ` : naoDeuTempo ? `
+                    <div class="bg-orange-50 border-2 border-orange-500 rounded-lg p-6 mb-4">
+                        <div class="text-center mb-4">
+                            <div class="text-4xl mb-2">⚠️</div>
+                            <h3 class="text-lg font-bold text-orange-700 mb-1">Esta tarefa não foi concluída</h3>
+                            <p class="text-orange-600 text-sm"><strong>Motivo:</strong> ${tarefa.motivo_nao_concluida}</p>
+                            <p class="text-xs text-gray-500 mt-1">Marcada às ${new Date(tarefa.horario_conclusao).toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'})}</p>
+                        </div>
+                        <div class="bg-yellow-50 border-l-4 border-yellow-400 p-3 rounded mb-4">
+                            <p class="text-sm text-yellow-800">💡 <strong>Sobrou tempo?</strong> Você pode refazer esta tarefa!</p>
+                        </div>
+                        <button onclick="app.refazerTarefa()" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg transition">
+                            🔄 REFAZER AGORA
+                        </button>
+                    </div>
+                ` : `
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <button onclick="app.concluirTarefa()" class="bg-green-500 hover:bg-green-600 text-white font-bold py-4 px-6 rounded-lg text-lg transition flex items-center justify-center gap-2">
+                            <span class="text-2xl">✅</span> CONCLUÍDA
+                        </button>
+                        <button onclick="app.abrirModalNaoDeuTempo()" class="bg-red-500 hover:bg-red-600 text-white font-bold py-4 px-6 rounded-lg text-lg transition flex items-center justify-center gap-2">
+                            <span class="text-2xl">❌</span> NÃO DEU TEMPO
+                        </button>
+                    </div>
+                `;
+
+                document.getElementById('app').innerHTML = `
+                    <div class="min-h-screen bg-gray-50">
+                        <div class="bg-cm-escuro text-white shadow-lg">
+                            <div class="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
+                                <div>
+                                    <h1 class="text-xl font-bold">${periodoTexto} · ${getNomeDia()}</h1>
+                                    <p class="text-xs text-gray-300">Tarefa ${this.tarefaAtualIndex + 1} de ${this.tarefas.length}</p>
+                                </div>
+                                <div class="flex gap-2">
+                                    <button onclick="app.abrirModalPausa()" class="bg-yellow-500 hover:bg-yellow-600 px-3 py-2 rounded-lg text-sm">⏸️ Pausar</button>
+                                    <button onclick="app.logout()" class="bg-red-500 hover:bg-red-600 px-3 py-2 rounded-lg text-sm">🚪 Sair</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-white shadow">
+                            <div class="max-w-6xl mx-auto px-4 py-3">
+                                <div class="flex justify-between items-center mb-1">
+                                    <span class="text-sm font-semibold text-gray-700">Progresso Geral</span>
+                                    <span class="text-sm font-bold text-cm-turquesa">${progresso}%</span>
+                                </div>
+                                <div class="w-full bg-gray-200 rounded-full h-3">
+                                    <div class="progress-bar bg-cm-verde h-3 rounded-full" style="width:${progresso}%"></div>
+                                </div>
+                                <div class="flex justify-between text-xs text-gray-500 mt-1">
+                                    <span>✅ <span id="metricaConcluidas">${this.metricas.concluidas}</span> concluídas</span>
+                                    <span>❌ ${this.metricas.nao_deu_tempo} não deram tempo</span>
+                                    <span>👤 <span id="metricaLeads">${this.metricas.leads_atendidos}</span> leads</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="max-w-6xl mx-auto px-4 py-6 md:pr-[320px]">
+                            <div class="bg-white rounded-lg shadow p-4 mb-6">
+                                <h3 class="text-sm font-bold text-gray-700 mb-3">Mapa de Tarefas:</h3>
+                                <div class="flex flex-wrap gap-2">${mapaTarefas}</div>
+                                <div class="flex flex-wrap gap-4 mt-3 text-xs text-gray-600">
+                                    <span class="flex items-center gap-1"><div class="w-3 h-3 bg-green-500 rounded"></div>Concluída</span>
+                                    <span class="flex items-center gap-1"><div class="w-3 h-3 bg-orange-400 rounded"></div>Não deu tempo</span>
+                                    <span class="flex items-center gap-1"><div class="w-3 h-3 bg-red-200 rounded"></div>Prioritária</span>
+                                    <span class="flex items-center gap-1"><div class="w-3 h-3 bg-gray-300 rounded"></div>Pendente</span>
+                                </div>
+                            </div>
+                            <div class="tarefa-card bg-white rounded-lg shadow-2xl overflow-hidden slide-in">
+                                <div class="${corHeader} text-white p-6">
+                                    <div class="flex items-start justify-between gap-4">
+                                        <div class="flex items-center gap-3 flex-1">
+                                            <span class="text-4xl">${tarefa.icone}</span>
+                                            <div>
+                                                <div class="mb-1">${badgeHtml}</div>
+                                                <p class="text-xs opacity-75 uppercase">${tarefa.categoria}</p>
+                                            </div>
+                                        </div>
+                                        ${timerHtml}
+                                    </div>
+                                </div>
+                                <div class="p-8">
+                                    <h3 class="text-xl font-bold text-gray-800 mb-6">${tarefa.texto}</h3>
+                                    ${tarefa.dica ? `
+                                        <div class="bg-blue-50 border-l-4 border-blue-400 p-4 rounded-lg mb-6">
+                                            <p class="text-sm font-semibold text-blue-800 mb-1">💡 DICA:</p>
+                                            <p class="text-gray-700 text-sm">${tarefa.dica}</p>
+                                        </div>` : ''}
+                                    ${contadorHtml}
+                                    ${contadorConcluidoHtml}
+                                    <div class="mt-6">${botoesAcao}</div>
+                                    <div class="flex justify-between mt-6 pt-6 border-t">
+                                        <button onclick="app.tarefaAnterior()"
+                                            ${this.tarefaAtualIndex === 0 ? 'disabled' : ''}
+                                            class="px-5 py-2 rounded-lg font-semibold ${this.tarefaAtualIndex === 0 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-gray-300 hover:bg-gray-400 text-gray-700'}">
+                                            ⬅️ Anterior
+                                        </button>
+                                        <span class="text-gray-500 flex items-center font-semibold text-sm">
+                                            ${this.tarefaAtualIndex + 1} / ${this.tarefas.length}
+                                        </span>
+                                        <button onclick="app.proximaTarefa()"
+                                            ${this.tarefaAtualIndex === this.tarefas.length - 1 ? 'disabled' : ''}
+                                            class="px-5 py-2 rounded-lg font-semibold ${this.tarefaAtualIndex === this.tarefas.length - 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-gray-300 hover:bg-gray-400 text-gray-700'}">
+                                            Próxima ➡️
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-4 gap-3 mt-6">
+                                <div class="bg-white p-3 rounded-lg shadow text-center">
+                                    <p class="text-2xl font-bold text-cm-turquesa">${this.metricas.concluidas}</p>
+                                    <p class="text-xs text-gray-500">Concluídas</p>
+                                </div>
+                                <div class="bg-white p-3 rounded-lg shadow text-center">
+                                    <p class="text-2xl font-bold text-red-500">${this.metricas.nao_deu_tempo}</p>
+                                    <p class="text-xs text-gray-500">Não Deram</p>
+                                </div>
+                                <div class="bg-white p-3 rounded-lg shadow text-center">
+                                    <p class="text-2xl font-bold text-blue-500">${this.metricas.leads_atendidos}</p>
+                                    <p class="text-xs text-gray-500">Leads</p>
+                                </div>
+                                <div class="bg-white p-3 rounded-lg shadow text-center">
+                                    <p class="text-2xl font-bold text-green-500">${progresso}%</p>
+                                    <p class="text-xs text-gray-500">Progresso</p>
+                                </div>
+                            </div>
+                        </div>
+                        ${this.renderSidebarRegras()}
+                    </div>`;
+
+                if (deveIniciarTimer) setTimeout(() => this.iniciarTimer(), 300);
+            }
+
+            renderSidebarRegras() {
+                return `
+                    <div class="sidebar-regras">
+                        <h3 class="text-base font-bold text-cm-escuro mb-3">⚠️ REGRAS DO DIA</h3>
+                        <div class="space-y-2 mb-6">
+                            ${this.regras.filter(r => r.tipo === 'regra').map(r => `
+                                <div class="regra-item bg-gray-50 p-3 rounded-lg">
+                                    <p class="text-xs font-semibold text-gray-800">${r.icone} ${r.texto}</p>
+                                </div>`).join('')}
+                        </div>
+                        <h3 class="text-base font-bold text-cm-escuro mb-3">💡 LEMBRETES</h3>
+                        <div class="space-y-2 mb-6">
+                            ${this.regras.filter(r => r.tipo === 'lembrete').map(r => `
+                                <div class="bg-yellow-50 border-l-4 border-yellow-400 p-3 rounded">
+                                    <p class="text-xs text-gray-700">${r.icone} ${r.texto}</p>
+                                </div>`).join('')}
+                        </div>
+                        <h3 class="text-base font-bold text-cm-escuro mb-3">📲 PLATAFORMAS</h3>
+                        <div class="space-y-2">
+                            <div class="flex justify-between items-center p-2 rounded ${this.statusPlataformas.whatsapp_ok ? 'bg-green-50' : 'bg-red-50'}">
+                                <span class="text-xs font-semibold">WhatsApp</span>
+                                <span>${this.statusPlataformas.whatsapp_ok ? '✅' : '❌'}</span>
+                            </div>
+                            <div class="flex justify-between items-center p-2 rounded ${this.statusPlataformas.ll_ok ? 'bg-green-50' : 'bg-red-50'}">
+                                <span class="text-xs font-semibold">LL (CRM)</span>
+                                <span>${this.statusPlataformas.ll_ok ? '✅' : '❌'}</span>
+                            </div>
+                            <div class="flex justify-between items-center p-2 rounded bg-green-50">
+                                <span class="text-xs font-semibold">App Rotina</span>
+                                <span>✅</span>
+                            </div>
+                        </div>
+                        ${isDiaEspecial() ? `
+                            <div class="mt-6 bg-yellow-50 border-l-4 border-yellow-400 p-3 rounded">
+                                <p class="text-xs font-bold text-yellow-800">📚 ${getNomeDia()}</p>
+                                <p class="text-xs text-yellow-700 mt-1">Prospecção e remarketing desativados hoje.</p>
+                            </div>` : ''}
+                    </div>`;
+            }
+
+            renderResumo() {
+                const periodoTexto = this.periodo === 'manha' ? '🌅 Manhã' : '🌆 Tarde';
+                const progresso = this.calcularProgresso();
+                const tarefasProblema = this.tarefas.filter(t => t.status === 'nao_deu_tempo');
+
+                document.getElementById('app').innerHTML = `
+                    <div class="min-h-screen bg-gray-50">
+                        <div class="bg-cm-escuro text-white shadow-lg">
+                            <div class="max-w-4xl mx-auto px-4 py-4 flex justify-between items-center">
+                                <h1 class="text-xl font-bold">Resumo — ${periodoTexto}</h1>
+                                <button onclick="app.renderDashboard()" class="bg-cm-turquesa hover:opacity-90 px-4 py-2 rounded-lg text-sm">🏠 Início</button>
+                            </div>
+                        </div>
+                        <div class="max-w-4xl mx-auto px-4 py-8">
+                            <div class="bg-white rounded-lg shadow-lg p-8 mb-6">
+                                <h2 class="text-3xl font-bold text-center text-cm-escuro mb-8">🎉 Rotina Finalizada!</h2>
+                                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                                    <div class="bg-green-50 p-6 rounded-lg text-center">
+                                        <p class="text-4xl font-bold text-green-600">${this.metricas.concluidas}</p>
+                                        <p class="text-sm text-gray-600">Concluídas</p>
+                                    </div>
+                                    <div class="bg-red-50 p-6 rounded-lg text-center">
+                                        <p class="text-4xl font-bold text-red-600">${this.metricas.nao_deu_tempo}</p>
+                                        <p class="text-sm text-gray-600">Não Deu Tempo</p>
+                                    </div>
+                                    <div class="bg-blue-50 p-6 rounded-lg text-center">
+                                        <p class="text-4xl font-bold text-blue-600">${this.metricas.leads_atendidos}</p>
+                                        <p class="text-sm text-gray-600">Leads Atendidos</p>
+                                    </div>
+                                    <div class="bg-purple-50 p-6 rounded-lg text-center">
+                                        <p class="text-4xl font-bold text-purple-600">${progresso}%</p>
+                                        <p class="text-sm text-gray-600">Completude</p>
+                                    </div>
+                                </div>
+                                ${tarefasProblema.length > 0 ? `
+                                    <div class="bg-yellow-50 border-l-4 border-yellow-400 p-6 rounded-lg mb-6">
+                                        <h3 class="font-bold text-yellow-800 mb-4">⚠️ Tarefas que Não Deram Tempo:</h3>
+                                        <div class="space-y-3">
+                                            ${tarefasProblema.map(t => `
+                                                <div class="bg-white p-4 rounded-lg">
+                                                    <p class="font-semibold text-gray-800">${t.texto}</p>
+                                                    <p class="text-sm text-gray-600 mt-1"><strong>Motivo:</strong> ${t.motivo_nao_concluida}</p>
+                                                </div>`).join('')}
+                                        </div>
+                                    </div>` : `
+                                    <div class="bg-green-50 border-l-4 border-green-500 p-6 rounded-lg mb-6 text-center">
+                                        <div class="text-5xl mb-3">🏆</div>
+                                        <p class="font-bold text-green-700 text-lg">Todas as tarefas concluídas!</p>
+                                        <p class="text-green-600 text-sm mt-1">Excelente desempenho hoje!</p>
+                                    </div>`}
+                                <button onclick="app.renderDashboard()" class="w-full btn-primary py-4 text-lg">
+                                    ✅ Finalizar e Voltar ao Início
+                                </button>
+                            </div>
+                        </div>
+                    </div>`;
+            }
+
+            voltarDashboard() { this.renderDashboard(); }
+
+            async renderMetricasIndividuais() {
+                await this.carregarMetricasHistorico();
+                const nomeUsuario = this.currentUser.user_metadata?.nome || this.currentUser.email.split('@')[0];
+                const ultimos7Dias = this.metricasHistorico;
+                const mediaGeral = ultimos7Dias.length > 0
+                    ? (ultimos7Dias.reduce((sum, m) => sum + parseFloat(m.taxa_conclusao), 0) / ultimos7Dias.length).toFixed(1) : 0;
+                const totalLeads = ultimos7Dias.reduce((sum, m) => sum + parseInt(m.leads_atendidos || 0), 0);
+                const totalConcluidas = ultimos7Dias.reduce((sum, m) => sum + parseInt(m.concluidas), 0);
+                const totalNaoDeuTempo = ultimos7Dias.reduce((sum, m) => sum + parseInt(m.nao_deu_tempo), 0);
+
+                const dadosPorDia = {};
+                ultimos7Dias.forEach(m => {
+                    if (!dadosPorDia[m.data]) dadosPorDia[m.data] = { manha: null, tarde: null };
+                    dadosPorDia[m.data][m.periodo] = parseFloat(m.taxa_conclusao);
+                });
+
+                const graficoHtml = Object.keys(dadosPorDia).sort().reverse().map(data => {
+                    const d = new Date(data + 'T00:00:00');
+                    const diaSemana = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'][d.getDay()];
+                    const dataFormatada = d.toLocaleDateString('pt-BR', {day:'2-digit',month:'2-digit'});
+                    const manha = dadosPorDia[data].manha;
+                    const tarde = dadosPorDia[data].tarde;
+                    const media = ((manha || 0) + (tarde || 0)) / (manha && tarde ? 2 : 1);
+                    return `
+                        <div>
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-sm font-semibold text-gray-700">${diaSemana} ${dataFormatada}</span>
+                                <span class="text-sm font-bold ${media >= 80 ? 'text-green-600' : media >= 60 ? 'text-orange-600' : 'text-red-600'}">${media.toFixed(0)}%</span>
+                            </div>
+                            <div class="flex gap-2">
+                                <div class="flex-1">
+                                    <div class="w-full bg-gray-200 rounded-full h-5">
+                                        <div class="bg-orange-400 h-5 rounded-full flex items-center justify-center text-xs text-white font-bold" style="width:${manha || 0}%">
+                                            ${manha > 20 ? '🌅 ' + manha.toFixed(0) + '%' : ''}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="flex-1">
+                                    <div class="w-full bg-gray-200 rounded-full h-5">
+                                        <div class="bg-blue-500 h-5 rounded-full flex items-center justify-center text-xs text-white font-bold" style="width:${tarde || 0}%">
+                                            ${tarde > 20 ? '🌆 ' + tarde.toFixed(0) + '%' : ''}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>`;
+                }).join('');
+
+                document.getElementById('app').innerHTML = `
+                    <div class="min-h-screen bg-gray-50">
+                        <div class="bg-cm-escuro text-white shadow-lg">
+                            <div class="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
+                                <div>
+                                    <h1 class="text-xl font-bold">📊 Meu Desempenho</h1>
+                                    <p class="text-xs text-gray-300">${nomeUsuario}</p>
+                                </div>
+                                <div class="flex gap-2">
+                                    <button onclick="app.voltarDashboard()" class="bg-cm-turquesa hover:opacity-90 px-4 py-2 rounded-lg text-sm">🏠 Voltar</button>
+                                    <button onclick="app.logout()" class="bg-red-500 hover:bg-red-600 px-4 py-2 rounded-lg text-sm">🚪 Sair</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="max-w-6xl mx-auto px-4 py-8">
+                            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                                <div class="bg-white rounded-lg shadow-lg p-6 border-t-4 border-cm-turquesa">
+                                    <p class="text-sm text-gray-600 mb-1">Média 7 Dias</p>
+                                    <p class="text-4xl font-bold text-cm-turquesa">${mediaGeral}%</p>
+                                </div>
+                                <div class="bg-white rounded-lg shadow-lg p-6 border-t-4 border-green-500">
+                                    <p class="text-sm text-gray-600 mb-1">Concluídas</p>
+                                    <p class="text-4xl font-bold text-green-600">${totalConcluidas}</p>
+                                </div>
+                                <div class="bg-white rounded-lg shadow-lg p-6 border-t-4 border-orange-500">
+                                    <p class="text-sm text-gray-600 mb-1">Não Deu Tempo</p>
+                                    <p class="text-4xl font-bold text-orange-600">${totalNaoDeuTempo}</p>
+                                </div>
+                                <div class="bg-white rounded-lg shadow-lg p-6 border-t-4 border-blue-500">
+                                    <p class="text-sm text-gray-600 mb-1">Leads Atendidos</p>
+                                    <p class="text-4xl font-bold text-blue-600">${totalLeads}</p>
+                                </div>
+                            </div>
+                            <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
+                                <h3 class="text-lg font-bold text-gray-800 mb-4">📈 Evolução Semanal</h3>
+                                <div class="space-y-3">${graficoHtml}</div>
+                            </div>
+                            <div class="bg-white rounded-lg shadow-lg p-6">
+                                <h3 class="text-lg font-bold text-gray-800 mb-4">⚠️ Tarefas que Mais Não Deram Tempo</h3>
+                                <div id="tarefasProblema">Carregando...</div>
+                            </div>
+                        </div>
+                    </div>`;
+                this.carregarTarefasProblemaIndividual();
+            }
+
+            async carregarTarefasProblemaIndividual() {
+                const { data, error } = await supabase.rpc('get_top_tarefas_problema', {
+                    p_user_id: this.currentUser.id, p_limite: 5
+                });
+                const container = document.getElementById('tarefasProblema');
+                if (error || !data || data.length === 0) {
+                    container.innerHTML = `
+                        <div class="text-center py-8">
+                            <div class="text-6xl mb-4">🎉</div>
+                            <p class="text-gray-600 font-semibold">Nenhuma tarefa com problemas recorrentes!</p>
+                        </div>`; return;
+                }
+                container.innerHTML = data.map((t, index) => `
+                    <div class="flex items-start gap-4 p-4 border-l-4 border-orange-500 bg-orange-50 rounded-lg mb-3">
+                        <div class="flex-shrink-0 w-8 h-8 bg-orange-500 text-white rounded-full flex items-center justify-center font-bold">${index + 1}</div>
+                        <div class="flex-1">
+                            <p class="font-semibold text-gray-800">${t.tarefa}</p>
+                            <p class="text-sm text-gray-600 mt-1"><strong>Motivo mais comum:</strong> ${t.motivo_comum || 'Não especificado'}</p>
+                            <p class="text-xs text-orange-600 mt-1">${t.ocorrencias} ocorrência(s) nos últimos 7 dias</p>
+                        </div>
+                    </div>`).join('');
+            }
+
+            async renderDashboardAdminGeral() {
+                await this.carregarRankingConsultores();
+                const mediaEquipe = this.rankingConsultores.length > 0
+                    ? (this.rankingConsultores.reduce((sum, c) => sum + parseFloat(c.media_conclusao), 0) / this.rankingConsultores.length).toFixed(1) : 0;
+
+                const rankingHtml = this.rankingConsultores.map((c, index) => {
+                    const pos = index + 1;
+                    const medalha = pos === 1 ? '🥇' : pos === 2 ? '🥈' : pos === 3 ? '🥉' : pos + 'º';
+                    const cor = c.media_conclusao >= 80 ? 'border-green-500' : c.media_conclusao >= 60 ? 'border-orange-500' : 'border-red-500';
+                    return `
+                        <div class="flex items-center gap-4 p-4 border-l-4 ${cor} bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer transition"
+                             onclick="app.verDetalhesConsultor('${c.user_id}')">
+                            <div class="w-10 text-center text-2xl">${medalha}</div>
+                            <div class="flex-1">
+                                <p class="font-bold text-gray-800">${c.consultor_nome}</p>
+                                <p class="text-xs text-gray-500">${c.consultor_email}</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-2xl font-bold ${c.media_conclusao >= 80 ? 'text-green-600' : c.media_conclusao >= 60 ? 'text-orange-600' : 'text-red-600'}">${c.media_conclusao}%</p>
+                                <p class="text-xs text-gray-500">${c.total_leads} leads</p>
+                            </div>
+                        </div>`;
+                }).join('');
+
+                document.getElementById('app').innerHTML = `
+                    <div class="min-h-screen bg-gray-50">
+                        <div class="bg-cm-escuro text-white shadow-lg">
+                            <div class="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
+                                <h1 class="text-xl font-bold">👥 Dashboard da Equipe</h1>
+                                <div class="flex gap-2">
+                                    <button onclick="app.renderPainelAlertas()" class="bg-red-500 hover:bg-red-600 px-4 py-2 rounded-lg text-sm relative">
+                                        🔔 Alertas
+                                        <span id="badgeAlertas" class="notif-badge" style="display:none;">0</span>
+                                    </button>
+                                    <button onclick="app.renderPainelUsuarios()" class="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg text-sm">👑 Usuários</button>
+                                    <button onclick="app.voltarDashboard()" class="bg-cm-turquesa hover:opacity-90 px-4 py-2 rounded-lg text-sm">🏠 Voltar</button>
+                                    <button onclick="app.logout()" class="bg-red-500 hover:bg-red-600 px-4 py-2 rounded-lg text-sm">🚪 Sair</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="max-w-6xl mx-auto px-4 py-8">
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                                <div class="bg-white rounded-lg shadow-lg p-6 border-t-4 border-cm-turquesa">
+                                    <p class="text-sm text-gray-600 mb-1">Média da Equipe</p>
+                                    <p class="text-4xl font-bold text-cm-turquesa">${mediaEquipe}%</p>
+                                    <p class="text-xs text-gray-500 mt-2">Últimos 7 dias</p>
+                                </div>
+                                <div class="bg-white rounded-lg shadow-lg p-6 border-t-4 border-green-500">
+                                    <p class="text-sm text-gray-600 mb-1">Total Consultores</p>
+                                    <p class="text-4xl font-bold text-green-600">${this.rankingConsultores.length}</p>
+                                    <p class="text-xs text-gray-500 mt-2">Ativos</p>
+                                </div>
+                                <div class="bg-white rounded-lg shadow-lg p-6 border-t-4 border-blue-500">
+                                    <p class="text-sm text-gray-600 mb-1">Top Performer</p>
+                                    <p class="text-2xl font-bold text-blue-600">${this.rankingConsultores[0]?.consultor_nome || '-'}</p>
+                                    <p class="text-xs text-gray-500 mt-2">${this.rankingConsultores[0]?.media_conclusao || 0}% média</p>
+                                </div>
+                            </div>
+                            <div class="bg-white rounded-lg shadow-lg p-6">
+                                <h3 class="text-lg font-bold text-gray-800 mb-4">🏆 Ranking de Consultores</h3>
+                                <div class="space-y-3">${rankingHtml}</div>
+                            </div>
+                        </div>
+                    </div>`;
+
+                setTimeout(() => this.atualizarBadgeAlertas(), 300);
+            }
+
+            async verDetalhesConsultor(userId) {
+                const { data: metricas } = await supabase
+                    .from('vw_metricas_diarias').select('*').eq('user_id', userId)
+                    .gte('data', new Date(Date.now() - 7*24*60*60*1000).toISOString().split('T')[0])
+                    .order('data', { ascending: false });
+
+                const { data: tarefasProblema } = await supabase.rpc('get_top_tarefas_problema', {
+                    p_user_id: userId, p_limite: 5
+                });
+
+                // Busca falhas por período (7, 15 e 30 dias)
+                const { data: falhasPeriodo } = await supabase.rpc('get_tarefas_problema_equipe', {
+                    p_user_id: userId
+                });
+
+                const c = this.rankingConsultores.find(x => x.user_id === userId);
+                if (!c) return;
+
+                const tabelaMetricas = (metricas || []).map(m => `
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-4 py-3 text-sm">${new Date(m.data).toLocaleDateString('pt-BR')}</td>
+                        <td class="px-4 py-3 text-sm">${m.periodo === 'manha' ? '🌅 Manhã' : '🌆 Tarde'}</td>
+                        <td class="px-4 py-3 text-sm text-right font-bold ${m.taxa_conclusao >= 80 ? 'text-green-600' : m.taxa_conclusao >= 60 ? 'text-orange-600' : 'text-red-600'}">${m.taxa_conclusao}%</td>
+                        <td class="px-4 py-3 text-sm text-right">${m.concluidas}</td>
+                        <td class="px-4 py-3 text-sm text-right">${m.nao_deu_tempo}</td>
+                        <td class="px-4 py-3 text-sm text-right">${m.leads_atendidos}</td>
+                    </tr>`).join('');
+
+                const falhasPeriodoHtml = falhasPeriodo && falhasPeriodo.length > 0
+                    ? falhasPeriodo.map((f, i) => `
+                        <div class="flex items-start gap-3 p-4 border-l-4 border-orange-500 bg-orange-50 rounded-lg mb-2">
+                            <div class="w-8 h-8 bg-orange-500 text-white rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0">${i+1}</div>
+                            <div class="flex-1">
+                                <p class="font-semibold text-gray-800 text-sm">${f.tarefa}</p>
+                                <div class="flex gap-3 mt-2 flex-wrap">
+                                    <span class="text-xs bg-red-100 text-red-700 px-2 py-1 rounded-full font-semibold">7 dias: ${f.falhas_7dias}x</span>
+                                    <span class="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded-full font-semibold">15 dias: ${f.falhas_15dias}x</span>
+                                    <span class="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded-full font-semibold">30 dias: ${f.falhas_30dias}x</span>
+                                </div>
+                                ${f.motivo_comum ? `<p class="text-xs text-gray-500 mt-1">Motivo mais comum: <strong>${f.motivo_comum}</strong></p>` : ''}
+                            </div>
+                        </div>`).join('')
+                    : `<div class="text-center py-8"><div class="text-5xl mb-3">🎉</div><p class="text-gray-600 font-semibold">Sem problemas recorrentes!</p></div>`;
+
+                document.getElementById('app').innerHTML = `
+                    <div class="min-h-screen bg-gray-50">
+                        <div class="bg-cm-escuro text-white shadow-lg">
+                            <div class="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
+                                <div>
+                                    <h1 class="text-xl font-bold">👤 ${c.consultor_nome}</h1>
+                                    <p class="text-xs text-gray-300">${c.consultor_email}</p>
+                                </div>
+                                <div class="flex gap-2">
+                                    <button onclick="app.renderDashboardAdminGeral()" class="bg-gray-600 hover:bg-gray-700 px-4 py-2 rounded-lg text-sm">⬅️ Voltar</button>
+                                    <button onclick="app.logout()" class="bg-red-500 hover:bg-red-600 px-4 py-2 rounded-lg text-sm">🚪 Sair</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="max-w-6xl mx-auto px-4 py-8">
+                            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                                <div class="bg-white rounded-lg shadow-lg p-6 border-t-4 border-cm-turquesa">
+                                    <p class="text-sm text-gray-600">Média 7 Dias</p>
+                                    <p class="text-4xl font-bold text-cm-turquesa">${c.media_conclusao}%</p>
+                                </div>
+                            
+
+
+
+<div class="bg-white rounded-lg shadow-lg p-6 border-t-4 border-green-500">
+                                    <p class="text-sm text-gray-600">Concluídas</p>
+                                    <p class="text-4xl font-bold text-green-600">${c.total_concluidas}</p>
+                                </div>
+                                <div class="bg-white rounded-lg shadow-lg p-6 border-t-4 border-orange-500">
+                                    <p class="text-sm text-gray-600">Não Deu Tempo</p>
+                                    <p class="text-4xl font-bold text-orange-600">${c.total_nao_deu_tempo}</p>
+                                </div>
+                                <div class="bg-white rounded-lg shadow-lg p-6 border-t-4 border-blue-500">
+                                    <p class="text-sm text-gray-600">Leads Atendidos</p>
+                                    <p class="text-4xl font-bold text-blue-600">${c.total_leads}</p>
+                                </div>
+                            </div>
+                            <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
+                                <h3 class="text-lg font-bold text-gray-800 mb-4">📅 Histórico Detalhado</h3>
+                                <div class="overflow-x-auto">
+                                    <table class="w-full">
+                                        <thead class="bg-gray-100">
+                                            <tr>
+                                                <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Data</th>
+                                                <th class="px-4 py-3 text-left text-sm font-semibold text-gray-700">Período</th>
+                                                <th class="px-4 py-3 text-right text-sm font-semibold text-gray-700">Conclusão</th>
+                                                <th class="px-4 py-3 text-right text-sm font-semibold text-gray-700">Concluídas</th>
+                                                <th class="px-4 py-3 text-right text-sm font-semibold text-gray-700">Não Deram</th>
+                                                <th class="px-4 py-3 text-right text-sm font-semibold text-gray-700">Leads</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-gray-200">${tabelaMetricas}</tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <div class="bg-white rounded-lg shadow-lg p-6">
+                                <h3 class="text-lg font-bold text-gray-800 mb-1">⚠️ Falhas por Tarefa</h3>
+                                <p class="text-xs text-gray-400 mb-4">Comparativo 7, 15 e 30 dias</p>
+                                <div class="space-y-2">${falhasPeriodoHtml}</div>
+                            </div>
+                        </div>
+                    </div>`;
+            }
+
+            abrirModalAdmin() {
+                const modal = document.createElement('div');
+                modal.id = 'modalAdmin';
+                modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+                modal.innerHTML = `
+                    <div class="bg-white rounded-lg p-8 max-w-md w-full mx-4 shadow-2xl">
+                        <h2 class="text-2xl font-bold text-purple-600 mb-2">👑 Ativar Modo Admin</h2>
+                        <p class="text-gray-600 mb-6 text-sm">Digite a senha para ativar:</p>
+                        <input type="password" id="senhaAdmin" placeholder="Senha secreta"
+                            class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg mb-6 focus:outline-none focus:border-purple-500 text-lg font-mono text-center" maxlength="20" />
+                        <div class="flex gap-3">
+                            <button onclick="app.fecharModalAdmin()" class="flex-1 btn-secondary">❌ Cancelar</button>
+                            <button onclick="app.confirmarAdmin()" class="flex-1 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg">✅ Confirmar</button>
+                        </div>
+                    </div>`;
+                document.body.appendChild(modal);
+                setTimeout(() => {
+                    const i = document.getElementById('senhaAdmin');
+                    if (i) i.focus();
+                }, 100);
+                document.getElementById('senhaAdmin')?.addEventListener('keypress', e => {
+                    if (e.key === 'Enter') this.confirmarAdmin();
+                });
+            }
+
+            fecharModalAdmin() { document.getElementById('modalAdmin')?.remove(); }
+
+            async confirmarAdmin() {
+                const input = document.getElementById('senhaAdmin');
+                if (!input) return;
+                if (input.value.trim() !== '071727') {
+                    alert('❌ Senha incorreta!'); input.value = ''; input.focus(); return;
+                }
+                try {
+                    await supabase.from('user_roles').upsert(
+                        { user_id: this.currentUser.id, is_admin: true },
+                        { onConflict: 'user_id' }
+                    );
+                    this.isAdmin = true;
+                    this.fecharModalAdmin();
+                    alert('🎉 Modo Admin ativado com sucesso!');
+                    await this.carregarDados();
+                    await this.verificarEGerarAlertas();
+                    this.iniciarMonitorAlertas();
+                    this.renderDashboard();
+                } catch (err) {
+                    alert('❌ Erro ao ativar admin: ' + err.message);
+                }
+            }
+        }
+
+        const app = new RotinaSequencial();
+    </script>
+</body>
+</html>
