@@ -638,34 +638,48 @@
                 this.currentUser = null;
                 this.renderLogin();
             }
+            
+getDataSaoPaulo(diasAtras = 0) {
+    const agora = new Date();
+    // Ajusta para UTC-3 (São Paulo)
+    const sp = new Date(agora.toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }));
+    sp.setDate(sp.getDate() - diasAtras);
+    const ano = sp.getFullYear();
+    const mes = String(sp.getMonth() + 1).padStart(2, '0');
+    const dia = String(sp.getDate()).padStart(2, '0');
+    return `${ano}-${mes}-${dia}`;
+}
+        
+      async carregarDados() {
+    const { data: regras } = await supabase
+        .from('regras_lembretes').select('*')
+        .eq('sempre_visivel', true).order('ordem');
+    this.regras = regras || [];
 
-            async carregarDados() {
-                const { data: regras } = await supabase
-                    .from('regras_lembretes').select('*')
-                    .eq('sempre_visivel', true).order('ordem');
-                this.regras = regras || [];
+    const hoje = this.getDataSaoPaulo();
+    const { data: status } = await supabase
+        .from('status_plataformas').select('*')
+        .eq('user_id', this.currentUser.id).eq('data', hoje).single();
+    if (status) this.statusPlataformas = status;
 
-                const hoje = new Date().toISOString().split('T')[0];
-                const { data: status } = await supabase
-                    .from('status_plataformas').select('*')
-                    .eq('user_id', this.currentUser.id).eq('data', hoje).single();
-                if (status) this.statusPlataformas = status;
+    await this.carregarMetricasHistorico();
+    if (this.isAdmin) {
+        await this.carregarRankingConsultores();
+        await this.atualizarBadgeAlertas();
+    }
+}
 
-                await this.carregarMetricasHistorico();
-                if (this.isAdmin) {
-                    await this.carregarRankingConsultores();
-                    await this.atualizarBadgeAlertas();
-                }
-            }
-
-            async carregarMetricasHistorico() {
-                const { data, error } = await supabase
-                    .from('vw_metricas_diarias').select('*')
-                    .eq('user_id', this.currentUser.id)
-                    .gte('data', new Date(Date.now() - 7*24*60*60*1000).toISOString().split('T')[0])
-                    .order('data', { ascending: false });
-                if (!error && data) this.metricasHistorico = data;
-            }
+          async carregarMetricasHistorico() {
+    const hoje = this.getDataSaoPaulo();
+    const seteDiasAtras = this.getDataSaoPaulo(7);
+    const { data, error } = await supabase
+        .from('vw_metricas_diarias').select('*')
+        .eq('user_id', this.currentUser.id)
+        .gte('data', seteDiasAtras)
+        .lte('data', hoje)
+        .order('data', { ascending: false });
+    if (!error && data) this.metricasHistorico = data;
+}
 
             async carregarRankingConsultores() {
                 const { data, error } = await supabase.from('vw_ranking_consultores').select('*');
