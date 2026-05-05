@@ -1297,7 +1297,7 @@ async salvarProgresso() {
                     <div class="max-w-4xl mx-auto flex gap-2 px-4 py-3 overflow-x-auto">
                         <button class="px-4 py-2 rounded-lg whitespace-nowrap font-semibold bg-cm-turquesa text-white">🏠 Início</button>
                         <button onclick="app.renderMetricasIndividuais()" class="px-4 py-2 rounded-lg whitespace-nowrap font-semibold bg-gray-200 text-gray-700 hover:bg-gray-300">📊 Meu Desempenho</button>
-                      // Dentro do renderDashboard, onde você tem os botões do admin:
+                     
 ${this.isAdmin ? `
     <button onclick="app.renderDashboardAdminGeral()" class="px-4 py-2 rounded-lg whitespace-nowrap font-semibold bg-gray-200 text-gray-700 hover:bg-gray-300">👥 Equipe</button>
    <div class="relative inline-block">
@@ -2154,6 +2154,17 @@ async buscarFalhasPorTarefaComFiltro(consultorId = null, dataInicio = null, data
         return [];
     }
     return data;
+}
+            aplicarFiltrosPainelAlertas() {
+    const consultorId = document.getElementById('filtroConsultor').value;
+    const dataInicio = document.getElementById('filtroDataInicio').value;
+    const dataFim = document.getElementById('filtroDataFim').value;
+    this.renderPainelAlertas(consultorId, dataInicio, dataFim);
+}
+
+resetarFiltrosPainelAlertas() {
+    const hoje = this.getDataSaoPaulo();
+    this.renderPainelAlertas('todos', hoje, hoje);
 }
             async confirmarAdmin() {
                 const input = document.getElementById('senhaAdmin');
