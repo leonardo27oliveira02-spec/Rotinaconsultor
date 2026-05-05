@@ -384,129 +384,394 @@
                     }
                 }
             }
+async renderPainelOperacional(consultorId = 'todos', dataInicio = null, dataFim = null) {
+    // Carrega a lista de consultores para o filtro
+    const consultores = await this.getConsultoresCadastrados();
 
-            async renderPainelAlertas() {
-                const { data: alertas, error } = await supabase
-                    .from('alertas_gestao')
-                    .select('*')
-                    .order('criado_em', { ascending: false })
-                    .limit(100);
+    // Define as datas padrão se não forem passadas
+    const hoje = this.getDataSaoPaulo();
+    if (!dataInicio) dataInicio = hoje;
+    if (!dataFim) dataFim = hoje;
 
-                // Busca médias de falha por tarefa (7, 15 e 30 dias)
-                const { data: falhasPorTarefa } = await supabase
-                    .rpc('get_falhas_por_periodo')
-                    .limit(10);
+    // Busca alertas (mantemos a lógica de alertas aqui, mas com filtro de data)
+    let queryAlertas = supabase.from('alertas_gestao').select('*');
+    if (consultorId !== 'todos') {
+        queryAlertas = queryAlertas.eq('consultor_id', consultorId);
+    }
+    queryAlertas = queryAlertas.gte('criado_em', `${dataInicio}T00:00:00.000Z`)
+                               .lte('criado_em', `${dataFim}T23:59:59.999Z`)
+                               .order('criado_em', { ascending: false });
+    const { data: alertas, error: errorAlertas } = await queryAlertas;
 
-                const hoje = new Date().toISOString().split('T')[0];
-                const alertasHoje = (alertas || []).filter(a => a.data === hoje);
-                const alertasAnteriores = (alertas || []).filter(a => a.data !== hoje);
+    // Busca falhas por tarefa (com filtro de consultor e data)
+    const { data: falhasPorTarefa, error: errorFalhas } = await supabase.rpc('get_falhas_por_periodo_filtrado', {
+        p_user_id: consultorId === 'todos' ? null : consultorId,
+        p_data_inicio: dataInicio,
+        p_data_fim: dataFim
+    });
 
-                const renderCard = (a) => {
-                    const statusCor = a.status === 'novo' ? 'border-red-500 bg-red-50' :
-                                      a.status === 'visto' ? 'border-yellow-500 bg-yellow-50' :
-                                      'border-green-500 bg-green-50';
-                    const statusLabel = a.status === 'novo' ? '🔴 Novo' :
-                                        a.status === 'visto' ? '🟡 Visto' : '🟢 Resolvido';
-                    const hora = new Date(a.criado_em).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
-                    return `
-                        <div class="notif-card ${a.status} border-l-4 ${statusCor} rounded-lg p-4 mb-3">
-                            <div class="flex items-start justify-between gap-3">
-                                <div class="flex-1">
-                                    <div class="flex items-center gap-2 mb-1">
-                                        <span class="text-xs font-bold px-2 py-0.5 rounded-full bg-white border">${statusLabel}</span>
-                                        <span class="text-xs text-gray-400">${hora}</span>
-                                    </div>
-                                    <p class="font-semibold text-gray-800 text-sm">⚠️ ${a.motivo}</p>
-                                    ${a.observacao ? `<p class="text-xs text-gray-600 mt-1 italic">📝 ${a.observacao}</p>` : ''}
-                                </div>
-                                <div class="flex flex-col gap-1 flex-shrink-0">
-                                    ${a.status === 'novo' ? `
-                                        <button onclick="app.marcarAlertaVisto('${a.id}')"
-                                            class="bg-yellow-500 hover:bg-yellow-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition">
-                                            👁️ Vi
-                                        </button>` : ''}
-                                    ${a.status !== 'resolvido' ? `
-                                        <button onclick="app.abrirModalResolverAlerta('${a.id}', \`${a.motivo.replace(/`/g,"'")}\`)"
-                                            class="bg-green-500 hover:bg-green-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition">
-                                            ✅ Resolver
-                                        </button>` : ''}
-                                </div>
-                            </div>
-                        </div>`;
-                };
+    // Busca o progresso diário para o painel "Ao Vivo"
+    let queryProgressoDiario = supabase.from('vw_progresso_diario_resumo').select('*');
+    if (consultorId !== 'todos') {
+        queryProgressoDiario = queryProgressoDiario.eq('user_id', consultorId);
+    }
+    queryProgressoDiario = queryProgressoDiario.eq('data', hoje); // Sempre mostra o progresso de hoje
+    const { data: progressoDiarioHoje, error: errorProgresso } = await queryProgressoDiario;
 
-                // Monta painel de falhas por tarefa se disponível
-                let falhasHtml = '<p class="text-gray-400 text-sm text-center py-4">Dados insuficientes ainda.</p>';
-                if (falhasPorTarefa && falhasPorTarefa.length > 0) {
-                    falhasHtml = falhasPorTarefa.map((f, i) => `
-                        <div class="flex items-start gap-3 p-3 border-l-4 border-orange-400 bg-orange-50 rounded-lg mb-2">
-                            <div class="w-7 h-7 bg-orange-500 text-white rounded-full flex items-center justify-center font-bold text-xs flex-shrink-0">${i+1}</div>
-                            <div class="flex-1">
-                                <p class="font-semibold text-gray-800 text-sm">${f.tarefa}</p>
-                                <div class="flex gap-3 mt-1 flex-wrap">
-                                    <span class="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">7d: ${f.falhas_7d}x</span>
-                                    <span class="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">15d: ${f.falhas_15d}x</span>
-                                    <span class="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">30d: ${f.falhas_30d}x</span>
-                                </div>
-                            </div>
-                        </div>`).join('');
-                }
+    // Renderiza cards de alerta
+    const renderCardAlerta = (a) => {
+        const statusCor = a.status === 'novo' ? 'border-red-500 bg-red-50' :
+                          a.status === 'visto' ? 'border-yellow-500 bg-yellow-50' :
+                          'border-green-500 bg-green-50';
+        const statusLabel = a.status === 'novo' ? '🔴 Novo' :
+                            a.status === 'visto' ? '🟡 Visto' : '🟢 Resolvido';
+        const hora = new Date(a.criado_em).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
+        return `
+            <div class="notif-card ${a.status} border-l-4 ${statusCor} rounded-lg p-4 mb-3">
+                <div class="flex items-start justify-between gap-3">
+                    <div class="flex-1">
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="text-xs font-bold px-2 py-0.5 rounded-full bg-white border">${statusLabel}</span>
+                            <span class="text-xs text-gray-400">${hora}</span>
+                        </div>
+                        <p class="font-semibold text-gray-800 text-sm">⚠️ ${a.motivo} (${a.consultor_nome})</p>
+                        ${a.observacao ? `<p class="text-xs text-gray-600 mt-1 italic">📝 ${a.observacao}</p>` : ''}
+                    </div>
+                    <div class="flex flex-col gap-1 flex-shrink-0">
+                        ${a.status === 'novo' ? `
+                            <button onclick="app.marcarAlertaVisto('${a.id}')"
+                                class="bg-yellow-500 hover:bg-yellow-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition">
+                                👁️ Vi
+                            </button>` : ''}
+                        ${a.status !== 'resolvido' ? `
+                            <button onclick="app.abrirModalResolverAlerta('${a.id}', \`${a.motivo.replace(/`/g,"'")}\`)"
+                                class="bg-green-500 hover:bg-green-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition">
+                                ✅ Resolver
+                            </button>` : ''}
+                    </div>
+                </div>
+            </div>`;
+    };
 
-                document.getElementById('app').innerHTML = `
-                    <div class="min-h-screen bg-gray-50">
-                        <div class="bg-cm-escuro text-white shadow-lg">
-                            <div class="max-w-5xl mx-auto px-4 py-4 flex justify-between items-center">
-                                <div>
-                                    <h1 class="text-xl font-bold">🔔 Central de Alertas</h1>
-                                    <p class="text-xs text-gray-300">${alertasHoje.length} alerta(s) hoje</p>
-                                </div>
-                                <div class="flex gap-2">
-                                    <button onclick="app.voltarDashboard()" class="bg-cm-turquesa hover:opacity-90 px-4 py-2 rounded-lg text-sm">🏠 Voltar</button>
-                                    <button onclick="app.logout()" class="bg-red-500 hover:bg-red-600 px-4 py-2 rounded-lg text-sm">🚪 Sair</button>
-                                </div>
+    // Monta painel de falhas por tarefa
+    let falhasHtml = '<p class="text-gray-400 text-sm text-center py-4">Nenhuma falha encontrada para o período e consultor selecionados.</p>';
+    if (falhasPorTarefa && falhasPorTarefa.length > 0) {
+        falhasHtml = falhasPorTarefa.map((f, i) => `
+            <div class="flex items-start gap-3 p-3 border-l-4 border-orange-400 bg-orange-50 rounded-lg mb-2">
+                <div class="w-7 h-7 bg-orange-500 text-white rounded-full flex items-center justify-center font-bold text-xs flex-shrink-0">${i+1}</div>
+                <div class="flex-1">
+                    <p class="font-semibold text-gray-800 text-sm">${f.tarefa}</p>
+                    <div class="flex gap-3 mt-1 flex-wrap">
+                        <span class="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">7d: ${f.falhas_7d}x</span>
+                        <span class="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">15d: ${f.falhas_15d}x</span>
+                        <span class="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">30d: ${f.falhas_30d}x</span>
+                    </div>
+                </div>
+            </div>`).join('');
+    }
+
+    // Monta painel de progresso diário "Ao Vivo"
+    let progressoAoVivoHtml = '<p class="text-gray-400 text-sm text-center py-4">Nenhum consultor iniciou a rotina hoje ou não há dados para o filtro.</p>';
+    if (progressoDiarioHoje && progressoDiarioHoje.length > 0) {
+        progressoAoVivoHtml = progressoDiarioHoje.map(p => {
+            const statusCor = p.status === 'finalizado' ? 'bg-green-100 text-green-700' :
+                              p.status === 'em_andamento' ? 'bg-blue-100 text-blue-700' :
+                              p.status === 'pausado' ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-700';
+            const statusLabel = p.status === 'finalizado' ? '✅ Finalizado' :
+                                p.status === 'em_andamento' ? '▶️ Em Andamento' :
+                                p.status === 'pausado' ? '⏸️ Pausado' : '⚪ Pendente';
+            const mediaConclusao = p.media_conclusao ? `${p.media_conclusao}%` : 'N/A';
+            return `
+                <div class="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 transition">
+                    <div class="flex items-center justify-between mb-2">
+                        <p class="font-bold text-gray-800">${p.consultor_nome}</p>
+                        <span class="text-xs font-semibold px-2 py-0.5 rounded-full ${statusCor}">${statusLabel}</span>
+                    </div>
+                    <div class="grid grid-cols-3 gap-2 text-center text-sm">
+                        <div>
+                            <p class="font-bold text-blue-600">${mediaConclusao}</p>
+                            <p class="text-xs text-gray-500">Média</p>
+                        </div>
+                        <div>
+                            <p class="font-bold text-green-600">${p.total_concluidas || 0}</p>
+                            <p class="text-xs text-gray-500">Concluídas</p>
+                        </div>
+                        <div>
+                            <p class="font-bold text-orange-600">${p.total_nao_deu_tempo || 0}</p>
+                            <p class="text-xs text-gray-500">Não Deu Tempo</p>
+                        </div>
+                    </div>
+                </div>`;
+        }).join('');
+    }
+
+    document.getElementById('app').innerHTML = `
+        <div class="min-h-screen bg-gray-50">
+            <div class="bg-cm-escuro text-white shadow-lg">
+                <div class="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
+                    <div class="flex items-center gap-3">
+                        <h1 class="text-xl font-bold">📡 Painel Operacional</h1>
+                        <span class="text-xs bg-gray-700 px-2 py-1 rounded-full">Atualiza a cada 60s</span>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="app.voltarDashboard()" class="bg-cm-turquesa hover:opacity-90 px-4 py-2 rounded-lg text-sm">🏠 Voltar</button>
+                        <button onclick="app.logout()" class="bg-red-500 hover:bg-red-600 px-4 py-2 rounded-lg text-sm">🚪 Sair</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="max-w-6xl mx-auto px-4 py-6">
+                <div class="bg-white rounded-lg shadow-lg p-5 mb-6">
+                    <h3 class="font-bold text-gray-800 mb-3">⚙️ Filtros</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label for="filtroConsultor" class="block text-sm font-medium text-gray-700 mb-1">Consultor:</label>
+                            <select id="filtroConsultor" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-cm-turquesa focus:border-cm-turquesa sm:text-sm">
+                                <option value="todos">Todos os Consultores</option>
+                                ${consultores.map(c => `<option value="${c.user_id}" ${c.user_id === consultorId ? 'selected' : ''}>${c.nome}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div>
+                            <label for="filtroDataInicio" class="block text-sm font-medium text-gray-700 mb-1">Data Início:</label>
+                            <input type="date" id="filtroDataInicio" value="${dataInicio}" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-cm-turquesa focus:border-cm-turquesa sm:text-sm">
+                        </div>
+                        <div>
+                            <label for="filtroDataFim" class="block text-sm font-medium text-gray-700 mb-1">Data Fim:</label>
+                            <input type="date" id="filtroDataFim" value="${dataFim}" class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-cm-turquesa focus:border-cm-turquesa sm:text-sm">
+                        </div>
+                    </div>
+                    <div class="flex gap-2 mt-4">
+                        <button onclick="app.aplicarFiltrosOperacional()" class="bg-cm-turquesa hover:opacity-90 text-white px-4 py-2 rounded-lg text-sm font-semibold">Aplicar Filtros</button>
+                        <button onclick="app.resetarFiltrosOperacional()" class="bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-2 rounded-lg text-sm font-semibold">Resetar</button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <div class="bg-white rounded-lg shadow-lg p-5 mb-6">
+                            <h3 class="font-bold text-gray-800 mb-3">📊 Progresso Diário (Hoje)</h3>
+                            <div class="space-y-3">
+                                ${progressoDiarioHoje && progressoDiarioHoje.length > 0 ? progressoAoVivoHtml : '<p class="text-gray-400 text-sm text-center py-4">Nenhum consultor iniciou a rotina hoje.</p>'}
                             </div>
                         </div>
 
-                        <div class="max-w-5xl mx-auto px-4 py-6 grid grid-cols-1 md:grid-cols-3 gap-4 mb-2">
-                            <div class="bg-white rounded-lg shadow p-5 border-t-4 border-red-500 text-center">
-                                <p class="text-3xl font-bold text-red-600">${(alertas||[]).filter(a=>a.status==='novo').length}</p>
-                                <p class="text-sm text-gray-500">Novos</p>
-                            </div>
-                            <div class="bg-white rounded-lg shadow p-5 border-t-4 border-yellow-500 text-center">
-                                <p class="text-3xl font-bold text-yellow-600">${(alertas||[]).filter(a=>a.status==='visto').length}</p>
-                                <p class="text-sm text-gray-500">Vistos</p>
-                            </div>
-                            <div class="bg-white rounded-lg shadow p-5 border-t-4 border-green-500 text-center">
-                                <p class="text-3xl font-bold text-green-600">${(alertas||[]).filter(a=>a.status==='resolvido').length}</p>
-                                <p class="text-sm text-gray-500">Resolvidos</p>
+                        <div class="bg-white rounded-lg shadow-lg p-5">
+                            <h3 class="font-bold text-gray-800 mb-3">🚨 Alertas (${alertas ? alertas.length : 0})</h3>
+                            <div class="space-y-3">
+                                ${alertas && alertas.length > 0 ? alertas.map(renderCardAlerta).join('') : '<p class="text-gray-400 text-sm text-center py-4">Nenhum alerta para o período e consultor selecionados.</p>'}
                             </div>
                         </div>
+                    </div>
 
-                        <div class="max-w-5xl mx-auto px-4 pb-8 grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div>
-                                <div class="bg-white rounded-lg shadow-lg p-5 mb-4">
-                                    <h3 class="font-bold text-gray-800 mb-3">🚨 Alertas de Hoje</h3>
-                                    ${alertasHoje.length > 0
-                                        ? alertasHoje.map(renderCard).join('')
-                                        : '<p class="text-gray-400 text-sm text-center py-6">✅ Nenhum alerta hoje</p>'}
-                                </div>
-                                ${alertasAnteriores.length > 0 ? `
-                                    <div class="bg-white rounded-lg shadow-lg p-5">
-                                        <h3 class="font-bold text-gray-800 mb-3">📋 Alertas Anteriores</h3>
-                                        ${alertasAnteriores.map(renderCard).join('')}
-                                    </div>` : ''}
-                            </div>
-
-                            <div>
-                                <div class="bg-white rounded-lg shadow-lg p-5">
-                                    <h3 class="font-bold text-gray-800 mb-1">📊 Tarefas com Mais Falhas</h3>
-                                    <p class="text-xs text-gray-400 mb-4">Média por período — toda a equipe</p>
-                                    ${falhasHtml}
-                                </div>
+                    <div>
+                        <div class="bg-white rounded-lg shadow-lg p-5">
+                            <h3 class="font-bold text-gray-800 mb-1">⚠️ Tarefas com Mais Falhas</h3>
+                            <p class="text-xs text-gray-400 mb-4">Média por período — equipe ou consultor</p>
+                            <div class="space-y-2">
+                                ${falhasHtml}
                             </div>
                         </div>
-                    </div>`;
-            }
+                    </div>
+                </div>
+            </div>
+        </div>`;
+
+    // Inicia o auto-refresh se não estiver ativo
+    if (this.painelOperacionalInterval) clearInterval(this.painelOperacionalInterval);
+    this.painelOperacionalInterval = setInterval(() => {
+        this.renderPainelOperacional(
+            document.getElementById('filtroConsultor')?.value,
+            document.getElementById('filtroDataInicio')?.value,
+            document.getElementById('filtroDataFim')?.value
+        );
+    }, 60000); // Atualiza a cada 60 segundos
+}
+
+            async getConsultoresCadastrados() {
+    const { data: consultores } = await supabase
+        .from('user_credentials').select('user_id, nome');
+    return consultores || [];
+}
+
+aplicarFiltrosOperacional() {
+    const consultorId = document.getElementById('filtroConsultor').value;
+    const dataInicio = document.getElementById('filtroDataInicio').value;
+    const dataFim = document.getElementById('filtroDataFim').value;
+    this.renderPainelOperacional(consultorId, dataInicio, dataFim);
+}
+
+resetarFiltrosOperacional() {
+    this.renderPainelOperacional(); // Chama sem parâmetros para resetar para hoje e todos
+}
+            
+           async renderPainelAlertas(consultorId = 'todos', dataInicio = null, dataFim = null) {
+    // Carrega todos os consultores para o seletor
+    const { data: todosConsultores } = await supabase
+        .from('user_credentials').select('user_id, nome').order('nome');
+
+    // Define as datas padrão se não forem passadas
+    const hoje = this.getDataSaoPaulo();
+    if (!dataInicio) dataInicio = hoje;
+    if (!dataFim) dataFim = hoje;
+
+    // Busca alertas e falhas com base nos filtros
+    let alertasFiltrados = [];
+    if (consultorId === 'todos') {
+        const { data, error } = await supabase
+            .from('alertas_gestao')
+            .select('*')
+            .order('criado_em', { ascending: false })
+            .limit(100);
+        if (!error) alertasFiltrados = data;
+    } else {
+        const { data, error } = await supabase
+            .from('alertas_gestao')
+            .select('*')
+            .eq('consultor_id', consultorId)
+            .order('criado_em', { ascending: false })
+            .limit(100);
+        if (!error) alertasFiltrados = data;
+    }
+
+    // Filtra alertas por período de data
+    alertasFiltrados = alertasFiltrados.filter(a => {
+        const alertaData = a.data; // Formato YYYY-MM-DD
+        return alertaData >= dataInicio && alertaData <= dataFim;
+    });
+
+    const alertasHoje = alertasFiltrados.filter(a => a.data === hoje);
+    const alertasAnteriores = alertasFiltrados.filter(a => a.data !== hoje);
+
+    // Busca falhas por tarefa com os filtros
+    const falhasPorTarefa = await this.buscarFalhasPorTarefaComFiltro(consultorId, dataInicio, dataFim);
+
+    const renderCard = (a) => {
+        const statusCor = a.status === 'novo' ? 'border-red-500 bg-red-50' :
+                          a.status === 'visto' ? 'border-yellow-500 bg-yellow-50' :
+                          'border-green-500 bg-green-50';
+        const statusLabel = a.status === 'novo' ? '🔴 Novo' :
+                            a.status === 'visto' ? '🟡 Visto' : '🟢 Resolvido';
+        const hora = new Date(a.criado_em).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'});
+        return `
+            <div class="notif-card ${a.status} border-l-4 ${statusCor} rounded-lg p-4 mb-3">
+                <div class="flex items-start justify-between gap-3">
+                    <div class="flex-1">
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="text-xs font-bold px-2 py-0.5 rounded-full bg-white border">${statusLabel}</span>
+                            <span class="text-xs text-gray-400">${hora}</span>
+                        </div>
+                        <p class="font-semibold text-gray-800 text-sm">⚠️ ${a.motivo}</p>
+                        ${a.observacao ? `<p class="text-xs text-gray-600 mt-1 italic">📝 ${a.observacao}</p>` : ''}
+                    </div>
+                    <div class="flex flex-col gap-1 flex-shrink-0">
+                        ${a.status === 'novo' ? `
+                            <button onclick="app.marcarAlertaVisto('${a.id}')"
+                                class="bg-yellow-500 hover:bg-yellow-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition">
+                                👁️ Vi
+                            </button>` : ''}
+                        ${a.status !== 'resolvido' ? `
+                            <button onclick="app.abrirModalResolverAlerta('${a.id}', \`${a.motivo.replace(/`/g,"'")}\`)"
+                                class="bg-green-500 hover:bg-green-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition">
+                                ✅ Resolver
+                            </button>` : ''}
+                    </div>
+                </div>
+            </div>`;
+    };
+
+    let falhasHtml = '<p class="text-gray-400 text-sm text-center py-4">Nenhuma falha encontrada para o período e consultor selecionados.</p>';
+    if (falhasPorTarefa && falhasPorTarefa.length > 0) {
+        falhasHtml = falhasPorTarefa.map((f, i) => `
+            <div class="flex items-start gap-3 p-3 border-l-4 border-orange-400 bg-orange-50 rounded-lg mb-2">
+                <div class="w-7 h-7 bg-orange-500 text-white rounded-full flex items-center justify-center font-bold text-xs flex-shrink-0">${i+1}</div>
+                <div class="flex-1">
+                    <p class="font-semibold text-gray-800 text-sm">${f.tarefa}</p>
+                    <div class="flex gap-3 mt-1 flex-wrap">
+                        <span class="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">7d: ${f.falhas_7d}x</span>
+                        <span class="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">15d: ${f.falhas_15d}x</span>
+                        <span class="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">30d: ${f.falhas_30d}x</span>
+                    </div>
+                </div>
+            </div>`).join('');
+    }
+
+    document.getElementById('app').innerHTML = `
+        <div class="min-h-screen bg-gray-50">
+            <div class="bg-cm-escuro text-white shadow-lg">
+                <div class="max-w-5xl mx-auto px-4 py-4 flex justify-between items-center">
+                    <div>
+                        <h1 class="text-xl font-bold">🔔 Central de Alertas e Análise Operacional</h1>
+                        <p class="text-xs text-gray-300">Filtre para ver alertas e falhas por consultor e período</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="app.voltarDashboard()" class="bg-cm-turquesa hover:opacity-90 px-4 py-2 rounded-lg text-sm">🏠 Voltar</button>
+                        <button onclick="app.logout()" class="bg-red-500 hover:bg-red-600 px-4 py-2 rounded-lg text-sm">🚪 Sair</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="max-w-5xl mx-auto px-4 py-6">
+                <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+                    <h3 class="font-bold text-gray-800 mb-4">Filtros de Análise</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                        <div>
+                            <label for="filtroConsultor" class="block text-sm font-medium text-gray-700 mb-1">Consultor:</label>
+                            <select id="filtroConsultor" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-cm-turquesa focus:border-cm-turquesa">
+                                <option value="todos">Todos os Consultores</option>
+                                ${todosConsultores.map(c => `<option value="${c.user_id}" ${c.user_id === consultorId ? 'selected' : ''}>${c.nome}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div>
+                            <label for="filtroDataInicio" class="block text-sm font-medium text-gray-700 mb-1">Data Início:</label>
+                            <input type="date" id="filtroDataInicio" value="${dataInicio}" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-cm-turquesa focus:border-cm-turquesa">
+                        </div>
+                        <div>
+                            <label for="filtroDataFim" class="block text-sm font-medium text-gray-700 mb-1">Data Fim:</label>
+                            <input type="date" id="filtroDataFim" value="${dataFim}" class="w-full p-2 border border-gray-300 rounded-lg focus:ring-cm-turquesa focus:border-cm-turquesa">
+                        </div>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="app.aplicarFiltrosPainelAlertas()" class="bg-cm-turquesa hover:opacity-90 text-white px-4 py-2 rounded-lg text-sm font-semibold">Aplicar Filtros</button>
+                        <button onclick="app.resetarFiltrosPainelAlertas()" class="bg-gray-300 hover:bg-gray-400 text-gray-800 px-4 py-2 rounded-lg text-sm font-semibold">Resetar</button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div class="bg-white rounded-lg shadow p-5 border-t-4 border-red-500 text-center">
+                        <p class="text-3xl font-bold text-red-600">${(alertasFiltrados||[]).filter(a=>a.status==='novo').length}</p>
+                        <p class="text-sm text-gray-500">Novos Alertas</p>
+                    </div>
+                    <div class="bg-white rounded-lg shadow p-5 border-t-4 border-yellow-500 text-center">
+                        <p class="text-3xl font-bold text-yellow-600">${(alertasFiltrados||[]).filter(a=>a.status==='visto').length}</p>
+                        <p class="text-sm text-gray-500">Alertas Vistos</p>
+                    </div>
+                    <div class="bg-white rounded-lg shadow p-5 border-t-4 border-green-500 text-center">
+                        <p class="text-3xl font-bold text-green-600">${(alertasFiltrados||[]).filter(a=>a.status==='resolvido').length}</p>
+                        <p class="text-sm text-gray-500">Alertas Resolvidos</p>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <div class="bg-white rounded-lg shadow-lg p-5 mb-4">
+                            <h3 class="font-bold text-gray-800 mb-3">🚨 Alertas no Período</h3>
+                            ${alertasFiltrados.length > 0
+                                ? alertasFiltrados.map(renderCard).join('')
+                                : '<p class="text-gray-400 text-sm text-center py-6">✅ Nenhum alerta encontrado para o período e consultor selecionados.</p>'}
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="bg-white rounded-lg shadow-lg p-5">
+                            <h3 class="font-bold text-gray-800 mb-1">📊 Tarefas com Mais Falhas</h3>
+                            <p class="text-xs text-gray-400 mb-4">Análise por período e consultor</p>
+                            ${falhasHtml}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>`;
+}
 
             async marcarAlertaVisto(id) {
                 await supabase.from('alertas_gestao').update({ status: 'visto' }).eq('id', id);
@@ -1032,14 +1297,16 @@ async salvarProgresso() {
                     <div class="max-w-4xl mx-auto flex gap-2 px-4 py-3 overflow-x-auto">
                         <button class="px-4 py-2 rounded-lg whitespace-nowrap font-semibold bg-cm-turquesa text-white">🏠 Início</button>
                         <button onclick="app.renderMetricasIndividuais()" class="px-4 py-2 rounded-lg whitespace-nowrap font-semibold bg-gray-200 text-gray-700 hover:bg-gray-300">📊 Meu Desempenho</button>
-                        ${this.isAdmin ? `
-                            <button onclick="app.renderDashboardAdminGeral()" class="px-4 py-2 rounded-lg whitespace-nowrap font-semibold bg-gray-200 text-gray-700 hover:bg-gray-300">👥 Equipe</button>
-                            <div class="relative inline-block">
-                                <button onclick="app.renderPainelAlertas()" class="px-4 py-2 rounded-lg whitespace-nowrap font-semibold bg-red-100 text-red-700 hover:bg-red-200">🔔 Alertas</button>
-                                <span id="badgeAlertas" class="notif-badge" style="display:none;">0</span>
-                            </div>
-                            <button onclick="app.renderPainelUsuarios()" class="px-4 py-2 rounded-lg whitespace-nowrap font-semibold bg-purple-100 text-purple-700 hover:bg-purple-200">👑 Usuários</button>
-                        ` : ''}
+                      // Dentro do renderDashboard, onde você tem os botões do admin:
+${this.isAdmin ? `
+    <button onclick="app.renderDashboardAdminGeral()" class="px-4 py-2 rounded-lg whitespace-nowrap font-semibold bg-gray-200 text-gray-700 hover:bg-gray-300">👥 Equipe</button>
+   <div class="relative inline-block">
+    <button onclick="app.renderPainelAlertas()" class="px-4 py-2 rounded-lg whitespace-nowrap font-semibold bg-red-100 text-red-700 hover:bg-red-200">📡 Operacional</button>
+    <span id="badgeAlertas" class="notif-badge" style="display:none;">0</span>
+</div>
+    <button onclick="app.renderPainelUsuarios()" class="px-4 py-2 rounded-lg whitespace-nowrap font-semibold bg-purple-100 text-purple-700 hover:bg-purple-200">👑 Usuários</button>
+    <button onclick="app.renderPainelOperacional()" class="px-4 py-2 rounded-lg whitespace-nowrap font-semibold bg-blue-100 text-blue-700 hover:bg-blue-200">📡 Operacional</button>
+` : ''}
                     </div>
                 </div>
                 <div class="max-w-4xl mx-auto px-4 py-8">
@@ -1868,7 +2135,26 @@ async salvarProgresso() {
             }
 
             fecharModalAdmin() { document.getElementById('modalAdmin')?.remove(); }
+async buscarFalhasPorTarefaComFiltro(consultorId = null, dataInicio = null, dataFim = null) {
+    let query = supabase.rpc('get_falhas_por_periodo_filtrado');
 
+    if (consultorId && consultorId !== 'todos') {
+        query = query.eq('p_user_id', consultorId);
+    }
+    if (dataInicio) {
+        query = query.gte('p_data_inicio', dataInicio);
+    }
+    if (dataFim) {
+        query = query.lte('p_data_fim', dataFim);
+    }
+
+    const { data, error } = await query.limit(10);
+    if (error) {
+        console.error('Erro ao buscar falhas por tarefa com filtro:', error);
+        return [];
+    }
+    return data;
+}
             async confirmarAdmin() {
                 const input = document.getElementById('senhaAdmin');
                 if (!input) return;
