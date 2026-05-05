@@ -772,46 +772,45 @@ getDataSaoPaulo(diasAtras = 0) {
                     if (el) el.textContent = this.metricas.leads_atendidos;
                 }
             }
+async iniciarRotina(periodo) {
+    this.periodo = periodo;
+    const { data: templates } = await supabase
+        .from('rotina_templates').select('*')
+        .eq('periodo', periodo).order('ordem');
+    if (!templates || templates.length === 0) {
+        alert('❌ Nenhuma tarefa encontrada para este período!'); return;
+    }
+    const tarefasFiltradas = filtrarTarefasPorDia(templates);
+    const hoje = this.getDataSaoPaulo(); // Usa a data de São Paulo
+    const { data: progressoSalvo } = await supabase
+        .from('progresso_diario').select('*')
+        .eq('user_id', this.currentUser.id).eq('data', hoje).eq('periodo', periodo).single();
 
-            async iniciarRotina(periodo) {
-                this.periodo = periodo;
-                const { data: templates } = await supabase
-                    .from('rotina_templates').select('*')
-                    .eq('periodo', periodo).order('ordem');
-                if (!templates || templates.length === 0) {
-                    alert('❌ Nenhuma tarefa encontrada para este período!'); return;
-                }
-                const tarefasFiltradas = filtrarTarefasPorDia(templates);
-                const hoje = new Date().toISOString().split('T')[0];
-                const { data: progressoSalvo } = await supabase
-                    .from('progresso_diario').select('*')
-                    .eq('user_id', this.currentUser.id).eq('data', hoje).eq('periodo', periodo).single();
+    if (progressoSalvo && (progressoSalvo.status === 'em_andamento' || progressoSalvo.status === 'pausado')) {
+        const continuar = confirm('Você tem uma rotina em andamento! Deseja continuar de onde parou?');
+        if (continuar) {
+            this.tarefas = progressoSalvo.progresso.tarefas;
+            this.tarefaAtualIndex = progressoSalvo.tarefa_atual_index;
+            this.metricas = progressoSalvo.metricas;
+            this.renderTarefaAtual(); return;
+        }
+    }
 
-                if (progressoSalvo && (progressoSalvo.status === 'em_andamento' || progressoSalvo.status === 'pausado')) {
-                    const continuar = confirm('Você tem uma rotina em andamento! Deseja continuar de onde parou?');
-                    if (continuar) {
-                        this.tarefas = progressoSalvo.progresso.tarefas;
-                        this.tarefaAtualIndex = progressoSalvo.tarefa_atual_index;
-                        this.metricas = progressoSalvo.metricas;
-                        this.renderTarefaAtual(); return;
-                    }
-                }
+    this.tarefas = tarefasFiltradas.map((t, index) => ({
+        ...t, index, status:'pendente',
+        motivo_nao_concluida:null, horario_conclusao:null, contador_valor:0
+    }));
+    this.tarefaAtualIndex = 0;
+    this.metricas = { total_tarefas:this.tarefas.length, concluidas:0, nao_deu_tempo:0, leads_atendidos:0 };
 
-                this.tarefas = tarefasFiltradas.map((t, index) => ({
-                    ...t, index, status:'pendente',
-                    motivo_nao_concluida:null, horario_conclusao:null, contador_valor:0
-                }));
-                this.tarefaAtualIndex = 0;
-                this.metricas = { total_tarefas:this.tarefas.length, concluidas:0, nao_deu_tempo:0, leads_atendidos:0 };
+    await supabase.from('progresso_diario').upsert({
+        user_id: this.currentUser.id, data: hoje, periodo,
+        tarefa_atual_index: 0, progresso: { tarefas: this.tarefas },
+        metricas: this.metricas, status:'em_andamento', iniciado_em: new Date().toISOString()
+    }, { onConflict:'user_id,data,periodo' });
 
-                await supabase.from('progresso_diario').upsert({
-                    user_id: this.currentUser.id, data: hoje, periodo,
-                    tarefa_atual_index: 0, progresso: { tarefas: this.tarefas },
-                    metricas: this.metricas, status:'em_andamento', iniciado_em: new Date().toISOString()
-                }, { onConflict:'user_id,data,periodo' });
-
-                this.renderTarefaAtual();
-            }
+    this.renderTarefaAtual();
+}
 
             async concluirTarefa() {
                 const tarefa = this.tarefas[this.tarefaAtualIndex];
@@ -849,16 +848,15 @@ getDataSaoPaulo(diasAtras = 0) {
                 this.renderTarefaAtual();
             }
 
-            async salvarProgresso() {
-                const hoje = new Date().toISOString().split('T')[0];
-                await supabase.from('progresso_diario').upsert({
-                    user_id: this.currentUser.id, data: hoje, periodo: this.periodo,
-                    tarefa_atual_index: this.tarefaAtualIndex,
-                    progresso: { tarefas: this.tarefas },
-                    metricas: this.metricas, status:'em_andamento'
-                }, { onConflict:'user_id,data,periodo' });
-            }
-
+async salvarProgresso() {
+    const hoje = this.getDataSaoPaulo(); // Usa a data de São Paulo
+    await supabase.from('progresso_diario').upsert({
+        user_id: this.currentUser.id, data: hoje, periodo: this.periodo,
+        tarefa_atual_index: this.tarefaAtualIndex,
+        progresso: { tarefas: this.tarefas },
+        metricas: this.metricas, status:'em_andamento'
+    }, { onConflict:'user_id,data,periodo' });
+}
             async finalizarRotina() {
                 const hoje = new Date().toISOString().split('T')[0];
                 this.pararTimer();
