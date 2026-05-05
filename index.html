@@ -1079,9 +1079,7 @@
     }
 
                 // Atualiza badge após renderizar
-                if (this.isAdmin) setTimeout(() => this.atualizarBadgeAlertas(), 500);
-            }
-
+        
             async renderPainelUsuarios() {
                 const { data: usuarios } = await supabase
                     .from('user_credentials').select('*').order('created_at', { ascending: false });
