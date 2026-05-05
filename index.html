@@ -997,100 +997,86 @@
                         </div>
                     </div>`;
             }
+    renderDashboard() {
+        const nomeUsuario = this.currentUser.user_metadata?.nome || this.currentUser.email.split('@')[0];
+        const horaAtual = new Date().getHours();
+        const periodo = horaAtual < 13 ? 'manha' : 'tarde';
+        const periodoTexto = periodo === 'manha' ? '🌅 Manhã' : '🌆 Tarde';
+        const diaEspecial = isDiaEspecial();
+        const nomeDia = getNomeDia();
 
-            renderDashboard() {
-                const nomeUsuario = this.currentUser.user_metadata?.nome || this.currentUser.email.split('@')[0];
-                const horaAtual = new Date().getHours();
-                const periodo = horaAtual < 13 ? 'manha' : 'tarde';
-                const periodoTexto = periodo === 'manha' ? '🌅 Manhã' : '🌆 Tarde';
-                const diaEspecial = isDiaEspecial();
-                const nomeDia = getNomeDia();
-
-                document.getElementById('app').innerHTML = `
-                    <div class="min-h-screen bg-gray-50">
-                        <div class="bg-cm-escuro text-white shadow-lg">
-                            <div class="max-w-4xl mx-auto px-4 py-4 flex justify-between items-center">
+        document.getElementById('app').innerHTML = `
+            <div class="min-h-screen bg-gray-50">
+                <div class="bg-cm-escuro text-white shadow-lg">
+                    <div class="max-w-4xl mx-auto px-4 py-4 flex justify-between items-center">
+                        <div>
+                            <h1 class="text-xl font-bold">C&M Rotina v3.3</h1>
+                            <p class="text-xs text-gray-300">Olá, ${nomeUsuario}! · ${nomeDia}</p>
+                        </div>
+                        <button onclick="app.logout()" class="bg-red-500 hover:bg-red-600 px-4 py-2 rounded-lg text-sm">🚪 Sair</button>
+                    </div>
+                </div>
+                <div class="bg-white shadow border-b">
+                    <div class="max-w-4xl mx-auto flex gap-2 px-4 py-3 overflow-x-auto">
+                        <button class="px-4 py-2 rounded-lg whitespace-nowrap font-semibold bg-cm-turquesa text-white">🏠 Início</button>
+                        <button onclick="app.renderMetricasIndividuais()" class="px-4 py-2 rounded-lg whitespace-nowrap font-semibold bg-gray-200 text-gray-700 hover:bg-gray-300">📊 Meu Desempenho</button>
+                        ${this.isAdmin ? `
+                            <button onclick="app.renderDashboardAdminGeral()" class="px-4 py-2 rounded-lg whitespace-nowrap font-semibold bg-gray-200 text-gray-700 hover:bg-gray-300">👥 Equipe</button>
+                            <div class="relative inline-block">
+                                <button onclick="app.renderPainelAlertas()" class="px-4 py-2 rounded-lg whitespace-nowrap font-semibold bg-red-100 text-red-700 hover:bg-red-200">🔔 Alertas</button>
+                                <span id="badgeAlertas" class="notif-badge" style="display:none;">0</span>
+                            </div>
+                            <button onclick="app.renderPainelUsuarios()" class="px-4 py-2 rounded-lg whitespace-nowrap font-semibold bg-purple-100 text-purple-700 hover:bg-purple-200">👑 Usuários</button>
+                        ` : ''}
+                    </div>
+                </div>
+                <div class="max-w-4xl mx-auto px-4 py-8">
+                    ${diaEspecial ? `
+                        <div class="aviso-dia-especial mb-6">
+                            <div class="flex items-start gap-3">
+                                <span class="text-2xl">📚</span>
                                 <div>
-                                    <h1 class="text-xl font-bold">C&M Rotina v3.3</h1>
-                                    <p class="text-xs text-gray-300">Olá, ${nomeUsuario}! · ${nomeDia}</p>
+                                    <p class="font-bold text-yellow-800 text-lg">Hoje é ${nomeDia} — Dia de Treinamento</p>
+                                    <p class="text-yellow-700 mt-1">As tarefas de <strong>prospecção</strong> e <strong>remarketing</strong> estão desativadas hoje.</p>
                                 </div>
-                                <button onclick="app.logout()" class="bg-red-500 hover:bg-red-600 px-4 py-2 rounded-lg text-sm">🚪 Sair</button>
+                            </div>
+                        </div>` : ''}
+                    <div class="bg-white rounded-lg shadow-lg p-8 mb-6">
+                        <h2 class="text-3xl font-bold text-cm-escuro mb-2 text-center">${periodoTexto}</h2>
+                        <p class="text-gray-500 text-center mb-8">Pronto para iniciar sua rotina?</p>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                            <div class="bg-blue-50 border-l-4 border-blue-400 p-4 rounded">
+                                <p class="font-semibold text-blue-800">📋 Tarefas do Período</p>
+                                <p class="text-2xl font-bold text-blue-900">${periodo === 'manha' ? '11' : (diaEspecial ? '14' : '16')}</p>
+                                ${diaEspecial ? '<p class="text-xs text-blue-600">2 tarefas ocultas hoje</p>' : ''}
+                            </div>
+                            <div class="bg-green-50 border-l-4 border-green-400 p-4 rounded">
+                                <p class="font-semibold text-green-800">🔴 Prioridade Máxima</p>
+                                <p class="text-sm font-bold text-green-900">Leads do quiz no WhatsApp</p>
+                                <p class="text-xs text-green-700">Atender em até 5 minutos</p>
                             </div>
                         </div>
-                        <div class="bg-white shadow border-b">
-                            <div class="max-w-4xl mx-auto flex gap-2 px-4 py-3 overflow-x-auto">
-                                <button class="px-4 py-2 rounded-lg whitespace-nowrap font-semibold bg-cm-turquesa text-white">🏠 Início</button>
-                                <button onclick="app.renderMetricasIndividuais()" class="px-4 py-2 rounded-lg whitespace-nowrap font-semibold bg-gray-200 text-gray-700 hover:bg-gray-300">📊 Meu Desempenho</button>
-                                ${this.isAdmin ? `
-                                    <button onclick="app.renderDashboardAdminGeral()" class="px-4 py-2 rounded-lg whitespace-nowrap font-semibold bg-gray-200 text-gray-700 hover:bg-gray-300">👥 Equipe</button>
-                                    <div class="relative inline-block">
-                                        <button onclick="app.renderPainelAlertas()" class="px-4 py-2 rounded-lg whitespace-nowrap font-semibold bg-red-100 text-red-700 hover:bg-red-200">
-                                            🔔 Alertas
-                                        </button>
-                                        <span id="badgeAlertas" class="notif-badge" style="display:none;">0</span>
-                                    </div>
-                                    <button onclick="app.renderPainelUsuarios()" class="px-4 py-2 rounded-lg whitespace-nowrap font-semibold bg-purple-100 text-purple-700 hover:bg-purple-200">👑 Usuários</button>
-                                ` : ''}
-                            </div>
-                        </div>
-                        <div class="max-w-4xl mx-auto px-4 py-8">
-                            ${diaEspecial ? `
-                                <div class="
-
-
-
-
-${diaEspecial ? `
-                                <div class="aviso-dia-especial mb-6">
-                                    <div class="flex items-start gap-3">
-                                        <span class="text-2xl">📚</span>
-                                        <div>
-                                            <p class="font-bold text-yellow-800 text-lg">Hoje é ${nomeDia} — Dia de Treinamento</p>
-                                            <p class="text-yellow-700 mt-1">As tarefas de <strong>prospecção</strong> e <strong>remarketing</strong> estão desativadas hoje.</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            ` : ''}
-                            <div class="bg-white rounded-lg shadow-lg p-8 mb-6">
-                                <h2 class="text-3xl font-bold text-cm-escuro mb-2 text-center">${periodoTexto}</h2>
-                                <p class="text-gray-500 text-center mb-8">Pronto para iniciar sua rotina?</p>
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-                                    <div class="bg-blue-50 border-l-4 border-blue-400 p-4 rounded">
-                                        <p class="font-semibold text-blue-800">📋 Tarefas do Período</p>
-                                        <p class="text-2xl font-bold text-blue-900">${periodo === 'manha' ? '11' : (diaEspecial ? '14' : '16')}</p>
-                                        ${diaEspecial ? '<p class="text-xs text-blue-600">2 tarefas ocultas hoje</p>' : ''}
-                                    </div>
-                                    <div class="bg-green-50 border-l-4 border-green-400 p-4 rounded">
-                                        <p class="font-semibold text-green-800">🔴 Prioridade Máxima</p>
-                                        <p class="text-sm font-bold text-green-900">Leads do quiz no WhatsApp</p>
-                                        <p class="text-xs text-green-700">Atender em até 5 minutos</p>
-                                    </div>
-                                </div>
-                                <button onclick="app.iniciarRotina('${periodo}')" class="w-full btn-primary text-lg py-4">
-                                    🚀 Iniciar Rotina de ${periodoTexto}
-                                </button>
-                                ${!this.isAdmin ? `
-                                    <button onclick="app.abrirModalAdmin()" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg mt-4 text-sm transition">
-                                        👑 Ativar Modo Admin
-                                    </button>
-                                ` : ''}
-                            </div>
-                            <div class="bg-yellow-50 border-l-4 border-yellow-400 p-6 rounded-lg">
-                                <h3 class="font-bold text-yellow-800 mb-3">💡 Como funciona:</h3>
-                                <ul class="text-gray-700 space-y-2 text-sm">
-                                    <li>✅ Uma tarefa por vez na tela</li>
-                                    <li>⏱️ Timer de 5 minutos nas tarefas prioritárias</li>
-                                    <li>➕ Contador rápido de leads atendidos</li>
-                                    <li>📊 Métricas em tempo real</li>
-                                    <li>💾 Salvamento automático a cada 30 segundos</li>
-                                    <li>❌ Opção "Não deu tempo" com justificativa</li>
-                                    <li>📅 Tarefas ajustadas automaticamente por dia da semana</li>
-                                    <li>🔔 Alertas automáticos de gestão a partir das 9h30</li>
-                                </ul>
-                            </div>
-                        </div>
-                        ${this.renderSidebarRegras()}
-                    </div>`;
+                        <button onclick="app.iniciarRotina('${periodo}')" class="w-full btn-primary text-lg py-4">🚀 Iniciar Rotina de ${periodoTexto}</button>
+                        ${!this.isAdmin ? `<button onclick="app.abrirModalAdmin()" class="w-full bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-lg mt-4 text-sm transition">👑 Ativar Modo Admin</button>` : ''}
+                    </div>
+                    <div class="bg-yellow-50 border-l-4 border-yellow-400 p-6 rounded-lg">
+                        <h3 class="font-bold text-yellow-800 mb-3">💡 Como funciona:</h3>
+                        <ul class="text-gray-700 space-y-2 text-sm">
+                            <li>✅ Uma tarefa por vez na tela</li>
+                            <li>⏱️ Timer de 5 minutos nas tarefas prioritárias</li>
+                            <li>➕ Contador rápido de leads atendidos</li>
+                            <li>📊 Métricas em tempo real</li>
+                            <li>💾 Salvamento automático a cada 30 segundos</li>
+                            <li>❌ Opção "Não deu tempo" com justificativa</li>
+                            <li>📅 Tarefas ajustadas por dia da semana</li>
+                            <li>🔔 Alertas automáticos a partir das 9h30</li>
+                        </ul>
+                    </div>
+                </div>
+                ${this.renderSidebarRegras()}
+            </div>`;
+        if (this.isAdmin) setTimeout(() => this.atualizarBadgeAlertas(), 500);
+    }
 
                 // Atualiza badge após renderizar
                 if (this.isAdmin) setTimeout(() => this.atualizarBadgeAlertas(), 500);
