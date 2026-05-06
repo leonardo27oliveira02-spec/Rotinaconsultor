@@ -2136,21 +2136,16 @@ ${this.isAdmin ? `
 
             fecharModalAdmin() { document.getElementById('modalAdmin')?.remove(); }
 async buscarFalhasPorTarefaComFiltro(consultorId = null, dataInicio = null, dataFim = null) {
-    let query = supabase.rpc('get_falhas_por_periodo_filtrado');
+    let query = supabase.rpc('get_falhas_por_periodo_filtrado', {
+        p_user_id: consultorId === 'todos' ? null : consultorId, // Passa null se for 'todos'
+        p_data_inicio: dataInicio,
+        p_data_fim: dataFim
+    });
 
-    if (consultorId && consultorId !== 'todos') {
-        query = query.eq('p_user_id', consultorId);
-    }
-    if (dataInicio) {
-        query = query.gte('p_data_inicio', dataInicio);
-    }
-    if (dataFim) {
-        query = query.lte('p_data_fim', dataFim);
-    }
+    const { data, error } = await query.limit(10); // O limit(10) já está na função SQL, pode ser redundante aqui mas não atrapalha
 
-    const { data, error } = await query.limit(10);
     if (error) {
-        console.error('Erro ao buscar falhas por tarefa com filtro:', error);
+        console.error('Erro ao buscar falhas por tarefa com filtro:', error.message || error); // Acessa error.message
         return [];
     }
     return data;
