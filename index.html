@@ -453,7 +453,7 @@ async renderPainelOperacional(consultorId = 'todos', dataInicio = null, dataFim 
             </div>`;
     };
 
-    // Monta painel de falhas por tarefa
+       // Monta painel de falhas por tarefa se disponível
     let falhasHtml = '<p class="text-gray-400 text-sm text-center py-4">Nenhuma falha encontrada para o período e consultor selecionados.</p>';
     if (falhasPorTarefa && falhasPorTarefa.length > 0) {
         falhasHtml = falhasPorTarefa.map((f, i) => `
