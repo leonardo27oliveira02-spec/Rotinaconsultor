@@ -608,7 +608,7 @@ resetarFiltrosOperacional() {
             async marcarAlertaVisto(id) {
                 await supabase.from('alertas_gestao').update({ status: 'visto' }).eq('id', id);
                 tocarSomAlerta();
-                await this.renderPainelAlertas();
+                await this.renderPainelOperacional();
                 await this.atualizarBadgeAlertas();
             }
 
@@ -641,7 +641,7 @@ resetarFiltrosOperacional() {
                     resolvido_em: new Date().toISOString()
                 }).eq('id', id);
                 document.getElementById('modalResolver')?.remove();
-                await this.renderPainelAlertas();
+                await this.renderPainelOperacional();
                 await this.atualizarBadgeAlertas();
             }
 
